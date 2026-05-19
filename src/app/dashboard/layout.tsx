@@ -13,6 +13,7 @@ const nav = [
   { href: "/dashboard/services", label: "Servicios" },
   { href: "/dashboard/products", label: "Productos" },
   { href: "/dashboard/anuncios", label: "Anuncios" },
+  { href: "/dashboard/configuracion", label: "Tarifas de envío" },
   { href: "/dashboard/delivery-men", label: "Repartidores" },
   { href: "/dashboard/analytics", label: "Estadísticas" },
 ];

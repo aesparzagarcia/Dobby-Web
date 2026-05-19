@@ -1,7 +1,13 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+
+const ShopLocationPickerMap = dynamic(
+  () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
+  { ssr: false, loading: () => <div className="h-[200px] bg-gray-100 animate-pulse rounded-lg border border-gray-200" /> }
+);
 
 type Shop = {
   id: string;
@@ -11,14 +17,26 @@ type Shop = {
   phone: string | null;
   logoUrl: string | null;
   status: string;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export default function ShopsPage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"closed" | "create" | "edit">("closed");
-  const [form, setForm] = useState({ name: "", type: "SHOP", address: "", phone: "", logoUrl: "", status: "ACTIVE" });
+  const [form, setForm] = useState({
+    name: "",
+    type: "SHOP",
+    address: "",
+    phone: "",
+    logoUrl: "",
+    status: "ACTIVE",
+    lat: null as number | null,
+    lng: null as number | null,
+  });
   const [editId, setEditId] = useState<string | null>(null);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,9 +54,16 @@ export default function ShopsPage() {
     e.preventDefault();
     const url = editId ? `/api/shops/${editId}` : "/api/shops";
     const method = editId ? "PUT" : "POST";
-    const body = editId
-      ? { name: form.name, type: form.type, address: form.address, phone: form.phone || null, logoUrl: form.logoUrl || null, status: form.status }
-      : { ...form, logoUrl: form.logoUrl || null };
+    const body = {
+      name: form.name,
+      type: form.type,
+      address: form.address,
+      phone: form.phone || null,
+      logoUrl: form.logoUrl || null,
+      status: form.status,
+      lat: form.lat,
+      lng: form.lng,
+    };
     const res = await fetch(apiPath(url), {
       method,
       headers: authHeaders(),
@@ -46,8 +71,9 @@ export default function ShopsPage() {
     });
     if (res.ok) {
       setModal("closed");
+      setMapPickerOpen(false);
       setEditId(null);
-      setForm({ name: "", type: "SHOP", address: "", phone: "", logoUrl: "", status: "ACTIVE" });
+      setForm({ name: "", type: "SHOP", address: "", phone: "", logoUrl: "", status: "ACTIVE", lat: null, lng: null });
       load();
     }
   }
@@ -61,6 +87,8 @@ export default function ShopsPage() {
       phone: shop.phone || "",
       logoUrl: shop.logoUrl || "",
       status: shop.status,
+      lat: shop.lat != null && Number.isFinite(Number(shop.lat)) ? Number(shop.lat) : null,
+      lng: shop.lng != null && Number.isFinite(Number(shop.lng)) ? Number(shop.lng) : null,
     });
     setModal("edit");
   }
@@ -115,7 +143,11 @@ export default function ShopsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Tiendas</h1>
         <button
-          onClick={() => { setModal("create"); setEditId(null); setForm({ name: "", type: "SHOP", address: "", phone: "", logoUrl: "", status: "ACTIVE" }); }}
+          onClick={() => {
+            setModal("create");
+            setEditId(null);
+            setForm({ name: "", type: "SHOP", address: "", phone: "", logoUrl: "", status: "ACTIVE", lat: null, lng: null });
+          }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Añadir tienda
@@ -201,7 +233,16 @@ export default function ShopsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Dirección</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-sm text-gray-600 m-0">Dirección</label>
+                  <button
+                    type="button"
+                    onClick={() => setMapPickerOpen(true)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline p-0 bg-transparent border-0 cursor-pointer"
+                  >
+                    Mapa
+                  </button>
+                </div>
                 <input
                   value={form.address}
                   onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
@@ -262,11 +303,35 @@ export default function ShopsPage() {
                 <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                   {modal === "create" ? "Crear" : "Guardar"}
                 </button>
-                <button type="button" onClick={() => setModal("closed")} className="border px-4 py-2 rounded hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModal("closed");
+                    setMapPickerOpen(false);
+                  }}
+                  className="border px-4 py-2 rounded hover:bg-gray-50"
+                >
                   Cancelar
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {mapPickerOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-2">Ubicación en el mapa</h3>
+            <ShopLocationPickerMap
+              initialLat={form.lat}
+              initialLng={form.lng}
+              initialAddress={form.address}
+              onClose={() => setMapPickerOpen(false)}
+              onApply={(lat, lng, address) => {
+                setForm((f) => ({ ...f, lat, lng, address }));
+                setMapPickerOpen(false);
+              }}
+            />
           </div>
         </div>
       )}
