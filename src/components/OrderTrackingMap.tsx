@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
 /** Avoid inertia panBy racing with React updates / fitBounds (fixes "classList" undefined on drag). */
 const MAP_OPTIONS: L.MapOptions = {
@@ -23,6 +22,30 @@ const destinationIcon = L.divIcon({
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });
+
+/** Keeps driver pin in sync on GPS polls without remounting the map. */
+function DriverMarker({ lat, lng }: { lat: number; lng: number }) {
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    markerRef.current?.setLatLng([lat, lng]);
+  }, [lat, lng]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[lat, lng]}
+      icon={driverIcon}
+      eventHandlers={{
+        add: (e) => {
+          markerRef.current = e.target;
+        },
+      }}
+    >
+      <Popup>Repartidor</Popup>
+    </Marker>
+  );
+}
 
 function FitBounds({ points, fitBoundsKey }: { points: L.LatLngExpression[]; fitBoundsKey: string }) {
   const map = useMap();
@@ -83,8 +106,6 @@ export function OrderTrackingMap({ mode, driver, destination, destinationLabel, 
     return out;
   }, [driver, destination]);
 
-  const showLine = points.length === 2;
-
   if (points.length === 0) {
     return (
       <div className="h-[320px] flex items-center justify-center bg-gray-100 text-gray-600 text-sm px-4 text-center rounded-lg border border-gray-200">
@@ -109,16 +130,13 @@ export function OrderTrackingMap({ mode, driver, destination, destinationLabel, 
         />
         <FitBounds points={points} fitBoundsKey={fitBoundsKey} />
         {driver && Number.isFinite(driver.lat) && Number.isFinite(driver.lng) && (
-          <Marker position={[driver.lat, driver.lng]} icon={driverIcon}>
-            <Popup>Repartidor</Popup>
-          </Marker>
+          <DriverMarker lat={driver.lat} lng={driver.lng} />
         )}
         {destination && Number.isFinite(destination.lat) && Number.isFinite(destination.lng) && (
           <Marker position={[destination.lat, destination.lng]} icon={destinationIcon}>
             <Popup>{destinationLabel}</Popup>
           </Marker>
         )}
-        {showLine && <Polyline positions={points} pathOptions={{ color: "#64748b", weight: 3, opacity: 0.85 }} />}
       </MapContainer>
     </div>
   );

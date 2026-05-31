@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import {
+  DEFAULT_PRODUCT_CATEGORY,
+  PRODUCT_CATEGORIES,
+  productCategoryLabel,
+  type ProductCategoryValue,
+} from "@/lib/productCategories";
 
 const MAX_PHOTOS = 3;
 
@@ -14,6 +20,7 @@ type Product = {
   hasPromotion: boolean;
   discount: number;
   isActive: boolean;
+  category?: string;
   shop: { name: string };
 };
 
@@ -33,6 +40,7 @@ export default function ProductsPage() {
     hasPromotion: false,
     discount: 0,
     isActive: true,
+    category: DEFAULT_PRODUCT_CATEGORY,
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
@@ -71,12 +79,18 @@ export default function ProductsPage() {
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
           isActive: form.isActive,
+          category: form.category,
         }
       : {
-          ...form,
-          price: Number(form.price),
-          discount: normalizedDiscount,
           shopId: form.shopId,
+          name: form.name,
+          description: form.description || null,
+          price: Number(form.price),
+          imageUrls: form.imageUrls,
+          hasPromotion: form.hasPromotion,
+          discount: normalizedDiscount,
+          isActive: form.isActive,
+          category: form.category,
         };
     const res = await fetch(apiPath(url), {
       method,
@@ -95,8 +109,12 @@ export default function ProductsPage() {
         hasPromotion: false,
         discount: 0,
         isActive: true,
+        category: DEFAULT_PRODUCT_CATEGORY,
       });
       load();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "No se pudo guardar el producto");
     }
   }
 
@@ -111,6 +129,9 @@ export default function ProductsPage() {
       hasPromotion: !!p.hasPromotion,
       discount: Number.isFinite(Number(p.discount)) ? Number(p.discount) : 0,
       isActive: p.isActive,
+      category: (PRODUCT_CATEGORIES.some((c) => c.value === p.category)
+        ? p.category
+        : DEFAULT_PRODUCT_CATEGORY) as ProductCategoryValue,
     });
     setModal("edit");
   }
@@ -201,6 +222,7 @@ export default function ProductsPage() {
               hasPromotion: false,
               discount: 0,
               isActive: true,
+              category: DEFAULT_PRODUCT_CATEGORY,
             });
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -260,6 +282,9 @@ export default function ProductsPage() {
                     </span>
                     <span className="mt-1 block text-[13px] font-medium text-black truncate w-full" title={p.shop?.name}>
                       {p.shop?.name ?? "—"}
+                    </span>
+                    <span className="mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-800">
+                      {productCategoryLabel(p.category)}
                     </span>
                     <span
                       className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
@@ -326,6 +351,23 @@ export default function ProductsPage() {
                   className="w-full border rounded px-3 py-2"
                   rows={2}
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">Categoría</label>
+                <select
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category: e.target.value as ProductCategoryValue }))
+                  }
+                  className="w-full border rounded px-3 py-2"
+                  required
+                >
+                  {PRODUCT_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center gap-2">
                 <input
