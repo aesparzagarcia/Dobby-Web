@@ -86,7 +86,7 @@ export function IconStats({ className = NAV_ICON }: { className?: string }) {
 export function IconDobbyLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#7C3AED" />
+      <rect width="32" height="32" rx="8" fill="#0061FF" />
       <circle cx="11" cy="14" r="2" fill="white" />
       <circle cx="21" cy="14" r="2" fill="white" />
       <path d="M10 19c2 2 10 2 12 0" stroke="white" strokeWidth="1.5" strokeLinecap="round" />

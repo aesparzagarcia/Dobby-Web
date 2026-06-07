@@ -8,7 +8,7 @@ const MAP_OPTIONS: L.MapOptions = { inertia: false };
 
 const driverIcon = L.divIcon({
   className: "ewe-map-pin ewe-map-pin-driver",
-  html: '<span style="display:block;width:14px;height:14px;background:#2563eb;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>',
+  html: '<span style="display:block;width:14px;height:14px;background:#0061FF;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>',
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });

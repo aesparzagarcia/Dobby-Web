@@ -12,7 +12,7 @@ export default function DashboardOverview() {
     const from = new Date();
     from.setMonth(from.getMonth() - 1);
     const to = new Date();
-    const q = `?from=${from.toISOString()}&to=${to.toISOString()}`;
+    const q = `?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`;
     Promise.all([
       fetch(apiPath(`/api/analytics/income${q}`), { headers: authHeaders() }).then((r) => r.json()),
       fetch(apiPath("/api/shops"), { headers: authHeaders() }).then((r) => r.json()),
@@ -41,28 +41,28 @@ export default function DashboardOverview() {
           <p className="text-xl font-semibold">
             {income != null ? `$${Number(income.total).toFixed(2)}` : "—"}
           </p>
-          <Link href="/dashboard/income" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/income" className="text-sm text-dobby-600 hover:underline">
             Ver detalles →
           </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500">Tiendas</p>
           <p className="text-xl font-semibold">{counts?.shops ?? "—"}</p>
-          <Link href="/dashboard/shops" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/shops" className="text-sm text-dobby-600 hover:underline">
             Gestionar →
           </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500">Servicios</p>
           <p className="text-xl font-semibold">{counts?.services ?? "—"}</p>
-          <Link href="/dashboard/services" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/services" className="text-sm text-dobby-600 hover:underline">
             Gestionar →
           </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500">Repartidores</p>
           <p className="text-xl font-semibold">{counts?.delivery ?? "—"}</p>
-          <Link href="/dashboard/delivery-men" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/delivery-men" className="text-sm text-dobby-600 hover:underline">
             Ver →
           </Link>
         </div>
@@ -70,8 +70,8 @@ export default function DashboardOverview() {
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="font-medium mb-2">Enlaces rápidos</h2>
         <ul className="space-y-1 text-sm">
-          <li><Link href="/dashboard/income" className="text-blue-600 hover:underline">Ingresos</Link></li>
-          <li><Link href="/dashboard/analytics" className="text-blue-600 hover:underline">Más vendidos y servicios más solicitados</Link></li>
+          <li><Link href="/dashboard/income" className="text-dobby-600 hover:underline">Ingresos</Link></li>
+          <li><Link href="/dashboard/analytics" className="text-dobby-600 hover:underline">Más vendidos y servicios más solicitados</Link></li>
         </ul>
       </div>
     </div>

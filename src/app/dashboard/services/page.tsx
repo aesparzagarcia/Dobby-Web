@@ -200,7 +200,7 @@ function ServiceCard({
         <h2 className="text-sm font-semibold text-gray-900 truncate" title={service.name}>
           {service.name}
         </h2>
-        <p className="text-[11px] font-medium text-violet-600 mt-0.5">
+        <p className="text-[11px] font-medium text-dobby-600 mt-0.5">
           {categoryLabels[service.category] ?? service.category}
         </p>
         {service.description ? (
@@ -249,8 +249,8 @@ function ServiceCard({
           aria-checked={service.isActive}
           disabled={togglingActive}
           onClick={() => onToggleActive(!service.isActive)}
-          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-50 ${
-            service.isActive ? "bg-violet-600" : "bg-gray-200"
+          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-500/40 disabled:opacity-50 ${
+            service.isActive ? "bg-dobby-600" : "bg-gray-200"
           }`}
         >
           <span
@@ -482,7 +482,7 @@ export default function ServicesPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
         >
           <IconPlus className="w-4 h-4" />
           Añadir servicio
@@ -497,13 +497,13 @@ export default function ServicesPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar servicio…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="">Estado: Todos</option>
           <option value="active">Estado: Activos</option>
@@ -512,7 +512,7 @@ export default function ServicesPage() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="recent">Ordenar por: Más recientes</option>
           <option value="name">Ordenar por: Nombre</option>
@@ -534,7 +534,7 @@ export default function ServicesPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="mt-4 text-sm font-medium text-violet-600 hover:text-violet-800"
+              className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
             >
               Añadir el primer servicio
             </button>
@@ -593,7 +593,7 @@ export default function ServicesPage() {
                         onClick={() => setPage(n)}
                         className={`min-w-[2.25rem] h-9 px-2 rounded-lg text-sm font-medium ${
                           n === safePage
-                            ? "bg-violet-600 text-white"
+                            ? "bg-dobby-600 text-white"
                             : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                       >
@@ -631,7 +631,7 @@ export default function ServicesPage() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={handleLogoChange}
                   disabled={logoUploading}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 file:text-sm file:font-medium"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700 file:text-sm file:font-medium"
                 />
                 {logoUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
                 {form.logoUrl && (
@@ -659,7 +659,7 @@ export default function ServicesPage() {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400 outline-none"
                   required
                 />
               </div>
@@ -724,7 +724,7 @@ export default function ServicesPage() {
                   id="isActive"
                   checked={form.isActive}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  className="rounded border-gray-300 text-dobby-600 focus:ring-dobby-500"
                 />
                 <label htmlFor="isActive" className="text-sm text-gray-700">
                   Activo
@@ -733,7 +733,7 @@ export default function ServicesPage() {
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700"
+                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700"
                 >
                   {modal === "create" ? "Crear" : "Guardar"}
                 </button>

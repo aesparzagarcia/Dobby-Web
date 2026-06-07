@@ -16,10 +16,10 @@ export function OrderAlertToasts() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="rounded-xl border border-violet-200 bg-white shadow-lg p-4 flex gap-3"
+          className="rounded-xl border border-dobby-200 bg-white shadow-lg p-4 flex gap-3"
           role="alert"
         >
-          <div className="w-10 h-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 text-lg">
+          <div className="w-10 h-10 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center shrink-0 text-lg">
             🛒
           </div>
           <div className="min-w-0 flex-1">
@@ -28,7 +28,7 @@ export function OrderAlertToasts() {
             <div className="mt-2 flex items-center gap-3">
               <Link
                 href="/dashboard/pedidos"
-                className="text-sm font-medium text-violet-600 hover:text-violet-800"
+                className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
                 onClick={() => dismissToast(toast.id)}
               >
                 Ver pedidos

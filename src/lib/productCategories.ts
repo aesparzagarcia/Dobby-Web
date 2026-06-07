@@ -1,6 +1,7 @@
 /** Debe coincidir con backend/src/constants/productCategories.ts */
 export const PRODUCT_CATEGORIES = [
   { value: "bebidas", label: "Bebidas" },
+  { value: "alcohol", label: "Alcohol" },
   { value: "postres", label: "Postres" },
   { value: "comidas", label: "Comidas" },
   { value: "snacks", label: "Snacks" },

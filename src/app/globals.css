@@ -2,7 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --dobby-primary: #0061ff;
+  --dobby-accent: #00c2a8;
+  --dobby-light: #f0f4ff;
+  --dobby-dark: #1d2b4f;
+  --dobby-warning: #ffb800;
+}
+
 @layer components {
+  .ewe-map-marker-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+
   /* Flecha separada del borde (el <select> nativo ignora padding-right). */
   .dashboard-filter-select {
     appearance: none;

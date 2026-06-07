@@ -90,7 +90,7 @@ function DashboardLayoutShell({
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f7fc]">
+      <div className="min-h-screen flex items-center justify-center bg-dobby-page">
         <p className="text-gray-500">Cargando…</p>
       </div>
     );
@@ -100,7 +100,7 @@ function DashboardLayoutShell({
     [user?.name, user?.lastName].filter(Boolean).join(" ").trim() || "Admin Dobby";
 
   return (
-    <div className="min-h-screen flex bg-[#f8f7fc]">
+    <div className="min-h-screen flex bg-dobby-page">
       <OrderAlertToasts />
       <aside className="w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-5 border-b border-gray-100">
@@ -119,16 +119,16 @@ function DashboardLayoutShell({
                 href={item.href}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   active
-                    ? "bg-violet-50 text-violet-700"
+                    ? "bg-dobby-50 text-dobby-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
                 <Icon
-                  className={`w-[18px] h-[18px] shrink-0 ${active ? "text-violet-600" : "text-gray-400"}`}
+                  className={`w-[18px] h-[18px] shrink-0 ${active ? "text-dobby-600" : "text-gray-400"}`}
                 />
                 <span className="flex-1">{item.label}</span>
                 {item.badgeKey === "orders" && badgeCount > 0 ? (
-                  <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center">
+                  <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-dobby-600 text-white text-xs font-bold flex items-center justify-center">
                     {badgeCount > 99 ? "99+" : badgeCount}
                   </span>
                 ) : null}
@@ -138,7 +138,7 @@ function DashboardLayoutShell({
         </nav>
         <div className="p-4 border-t border-gray-100 space-y-2">
           <div className="flex items-center gap-3 px-2 py-1">
-            <div className="w-9 h-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-semibold shrink-0">
+            <div className="w-9 h-9 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center text-sm font-semibold shrink-0">
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">

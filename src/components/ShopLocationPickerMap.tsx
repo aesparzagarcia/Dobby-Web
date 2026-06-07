@@ -73,7 +73,7 @@ function CenterPinOverlay() {
         width={48}
         height={48}
         viewBox="0 0 24 24"
-        className="text-blue-600 drop-shadow-md -mt-6"
+        className="text-dobby-600 drop-shadow-md -mt-6"
         fill="currentColor"
         aria-hidden
       >
@@ -276,7 +276,7 @@ export function ShopLocationPickerMap({
             const c = latestCenterRef.current!;
             onApply(c.lat, c.lng, addr);
           }}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          className="bg-dobby-600 text-white px-4 py-2 rounded hover:bg-dobby-700 text-sm"
         >
           Aplicar ubicación
         </button>

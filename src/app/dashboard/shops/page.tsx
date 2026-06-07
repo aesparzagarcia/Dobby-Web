@@ -162,8 +162,8 @@ function ShopCard({
             className="w-full h-full object-cover object-center"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-100 to-violet-50">
-            <span className="text-2xl font-bold text-violet-300">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-dobby-100 to-dobby-50">
+            <span className="text-2xl font-bold text-dobby-300">
               {shop.name.charAt(0).toUpperCase()}
             </span>
           </div>
@@ -233,7 +233,7 @@ function ShopCard({
           className="flex items-center gap-1 text-[11px] text-gray-500 mt-1 truncate"
           title={shop.address}
         >
-          <IconLocation className="w-3 h-3 text-violet-500 shrink-0" />
+          <IconLocation className="w-3 h-3 text-dobby-500 shrink-0" />
           <span className="truncate">{shop.address}</span>
         </p>
         {hours ? (
@@ -280,8 +280,8 @@ function ShopCard({
           aria-checked={isActive}
           disabled={togglingActive}
           onClick={() => onToggleActive(!isActive)}
-          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-50 ${
-            isActive ? "bg-violet-600" : "bg-gray-200"
+          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-500/40 disabled:opacity-50 ${
+            isActive ? "bg-dobby-600" : "bg-gray-200"
           }`}
         >
           <span
@@ -535,7 +535,7 @@ export default function ShopsPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
         >
           <IconPlus className="w-4 h-4" />
           Añadir tienda
@@ -550,13 +550,13 @@ export default function ShopsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar tienda o restaurante…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="">Estado: Todos</option>
           <option value="ACTIVE">Estado: Activas</option>
@@ -565,7 +565,7 @@ export default function ShopsPage() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="recent">Ordenar por: Más recientes</option>
           <option value="name">Ordenar por: Nombre</option>
@@ -588,7 +588,7 @@ export default function ShopsPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="mt-4 text-sm font-medium text-violet-600 hover:text-violet-800"
+              className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
             >
               Añadir la primera tienda
             </button>
@@ -647,7 +647,7 @@ export default function ShopsPage() {
                         onClick={() => setPage(n)}
                         className={`min-w-[2.25rem] h-9 px-2 rounded-lg text-sm font-medium ${
                           n === safePage
-                            ? "bg-violet-600 text-white"
+                            ? "bg-dobby-600 text-white"
                             : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                       >
@@ -682,7 +682,7 @@ export default function ShopsPage() {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400 outline-none"
                   required
                 />
               </div>
@@ -704,7 +704,7 @@ export default function ShopsPage() {
                   <button
                     type="button"
                     onClick={() => setMapPickerOpen(true)}
-                    className="text-sm font-medium text-violet-600 hover:text-violet-800"
+                    className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
                   >
                     Mapa
                   </button>
@@ -762,7 +762,7 @@ export default function ShopsPage() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={handleLogoChange}
                   disabled={logoUploading}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 file:text-sm file:font-medium"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700 file:text-sm file:font-medium"
                 />
                 {logoUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
                 {form.logoUrl && (
@@ -799,7 +799,7 @@ export default function ShopsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700"
+                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700"
                 >
                   {modal === "create" ? "Crear" : "Guardar"}
                 </button>

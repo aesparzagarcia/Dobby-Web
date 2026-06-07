@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { authHeaders, apiPath } from "@/lib/api";
+import { authHeaders, apiPath, uploadsUrl } from "@/lib/api";
 import {
   Bar,
   BarChart,
@@ -19,6 +19,8 @@ type IncomeShop = {
   shopId: string;
   shopName: string;
   logoUrl: string | null;
+  productsRevenue: number;
+  deliveryRevenue: number;
   revenue: number;
   orderCount: number;
   percentOfTotal: number;
@@ -299,7 +301,7 @@ export default function IncomePage() {
             type="button"
             onClick={exportCsv}
             disabled={!data}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 text-violet-700 text-sm font-medium bg-white hover:bg-violet-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dobby-200 text-dobby-700 text-sm font-medium bg-white hover:bg-dobby-50 disabled:opacity-50"
           >
             <IconDownload className="w-4 h-4" />
             Exportar
@@ -307,7 +309,7 @@ export default function IncomePage() {
           <button
             type="button"
             onClick={() => setShowFilters((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700"
           >
             <IconFilter className="w-4 h-4" />
             Filtros
@@ -368,7 +370,7 @@ export default function IncomePage() {
               label="Ingreso total"
               value={formatMoney(s.totalRevenue)}
               trend={s.trends.totalRevenuePct}
-              iconBg="bg-violet-100 text-violet-600"
+              iconBg="bg-dobby-100 text-dobby-600"
               icon={
                 <span className="text-lg font-bold" aria-hidden>
                   $
@@ -437,7 +439,7 @@ export default function IncomePage() {
                     onClick={() => setChartGranularity(key)}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                       chartGranularity === key
-                        ? "bg-violet-600 text-white shadow-sm"
+                        ? "bg-dobby-600 text-white shadow-sm"
                         : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
@@ -473,7 +475,7 @@ export default function IncomePage() {
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm">
                             <p className="text-gray-500">{formatChartTooltipDate(row.key)}</p>
-                            <p className="font-semibold text-violet-700">
+                            <p className="font-semibold text-dobby-700">
                               Ingreso: {formatMoney(row.value)}
                             </p>
                           </div>
@@ -489,7 +491,10 @@ export default function IncomePage() {
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">Ingresos por tienda</h2>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Ingresos por tienda</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                Productos vendidos y envíos generados por cada tienda en el período.
+              </p>
               {data.byShop.length === 0 ? (
                 <p className="text-sm text-gray-500">No hay pedidos entregados en este período.</p>
               ) : (
@@ -498,9 +503,10 @@ export default function IncomePage() {
                     <thead>
                       <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
                         <th className="pb-3 font-medium">Tienda</th>
-                        <th className="pb-3 font-medium text-right">Ingresos</th>
+                        <th className="pb-3 font-medium text-right">Productos</th>
+                        <th className="pb-3 font-medium text-right">Envíos</th>
                         <th className="pb-3 font-medium text-right">Pedidos</th>
-                        <th className="pb-3 font-medium text-right w-36">% del total</th>
+                        <th className="pb-3 font-medium text-right w-36">% productos</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -510,12 +516,12 @@ export default function IncomePage() {
                             <div className="flex items-center gap-2.5 min-w-0">
                               {shop.logoUrl ? (
                                 <img
-                                  src={shop.logoUrl}
+                                  src={uploadsUrl(shop.logoUrl)}
                                   alt=""
                                   className="w-8 h-8 rounded-full object-cover bg-gray-100"
                                 />
                               ) : (
-                                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center text-xs font-bold shrink-0">
                                   {shop.shopName.charAt(0).toUpperCase()}
                                 </div>
                               )}
@@ -524,8 +530,11 @@ export default function IncomePage() {
                               </span>
                             </div>
                           </td>
-                          <td className="py-3 text-right font-medium tabular-nums">
-                            {formatMoney(shop.revenue)}
+                          <td className="py-3 text-right font-medium tabular-nums text-gray-900">
+                            {formatMoney(shop.productsRevenue ?? shop.revenue)}
+                          </td>
+                          <td className="py-3 text-right font-medium tabular-nums text-sky-700">
+                            {formatMoney(shop.deliveryRevenue ?? 0)}
                           </td>
                           <td className="py-3 text-right text-gray-600 tabular-nums">
                             {shop.orderCount}
@@ -534,7 +543,7 @@ export default function IncomePage() {
                             <div className="flex items-center justify-end gap-2">
                               <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-violet-500 rounded-full"
+                                  className="h-full bg-dobby-500 rounded-full"
                                   style={{ width: `${Math.min(100, shop.percentOfTotal)}%` }}
                                 />
                               </div>
@@ -546,12 +555,33 @@ export default function IncomePage() {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="border-t border-gray-100 text-xs font-semibold text-gray-700">
+                        <td className="pt-3">Total (mostradas)</td>
+                        <td className="pt-3 text-right tabular-nums">
+                          {formatMoney(
+                            data.byShop
+                              .slice(0, 6)
+                              .reduce((s, shop) => s + (shop.productsRevenue ?? shop.revenue), 0)
+                          )}
+                        </td>
+                        <td className="pt-3 text-right tabular-nums text-sky-700">
+                          {formatMoney(
+                            data.byShop.slice(0, 6).reduce((s, shop) => s + (shop.deliveryRevenue ?? 0), 0)
+                          )}
+                        </td>
+                        <td className="pt-3 text-right tabular-nums">
+                          {data.byShop.slice(0, 6).reduce((s, shop) => s + shop.orderCount, 0)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
               <Link
                 href="/dashboard/shops"
-                className="inline-flex items-center gap-1 text-sm font-medium text-violet-600 hover:text-violet-800 mt-4"
+                className="inline-flex items-center gap-1 text-sm font-medium text-dobby-600 hover:text-dobby-800 mt-4"
               >
                 Ver todas las tiendas
                 <span aria-hidden>›</span>
@@ -596,9 +626,9 @@ export default function IncomePage() {
                   </li>
                 ) : null}
               </ul>
-              <div className="mt-5 rounded-xl bg-violet-50 border border-violet-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-violet-900">Ingreso total</span>
-                <span className="text-lg font-bold text-violet-700 tabular-nums">
+              <div className="mt-5 rounded-xl bg-dobby-50 border border-dobby-100 px-4 py-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-dobby-900">Ingreso total</span>
+                <span className="text-lg font-bold text-dobby-700 tabular-nums">
                   {formatMoney(b.netIncome)}
                 </span>
               </div>
@@ -610,7 +640,7 @@ export default function IncomePage() {
               <h2 className="text-base font-semibold text-gray-900">Pedidos recientes</h2>
               <Link
                 href="/dashboard/pedidos"
-                className="text-sm font-medium text-violet-600 hover:text-violet-800"
+                className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
               >
                 Ver todos los pedidos →
               </Link>

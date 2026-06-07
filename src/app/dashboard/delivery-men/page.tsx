@@ -45,9 +45,9 @@ type DriverLocation = {
   lastSeenAt: string | null;
 };
 
-/** Solo repartidores con estado En línea pueden abrir el mapa de ubicación. */
+/** Ubicación visible si el repartidor está conectado (en línea o en reparto). */
 function canViewLocation(status: string) {
-  return status === "ONLINE";
+  return status === "ONLINE" || status === "ON_DELIVERY";
 }
 
 const defaultForm = {
@@ -405,7 +405,7 @@ export default function DeliveryMenPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 shrink-0 bg-violet-600 hover:bg-violet-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition-colors"
+          className="inline-flex items-center justify-center gap-2 shrink-0 bg-dobby-600 hover:bg-dobby-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition-colors"
         >
           <span className="text-lg leading-none">+</span>
           Añadir repartidor
@@ -429,7 +429,7 @@ export default function DeliveryMenPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar repartidor..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400"
           />
         </div>
         <div className="flex flex-wrap gap-3">
@@ -438,7 +438,7 @@ export default function DeliveryMenPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="dashboard-filter-select bg-white border border-gray-200 rounded-lg pl-3 py-2.5 text-sm min-w-[120px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              className="dashboard-filter-select bg-white border border-gray-200 rounded-lg pl-3 py-2.5 text-sm min-w-[120px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
             >
               <option value="">Todos</option>
               <option value="ONLINE">En línea</option>
@@ -451,7 +451,7 @@ export default function DeliveryMenPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="dashboard-filter-select bg-white border border-gray-200 rounded-lg pl-3 py-2.5 text-sm min-w-[150px] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              className="dashboard-filter-select bg-white border border-gray-200 rounded-lg pl-3 py-2.5 text-sm min-w-[150px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
             >
               <option value="recent">Más recientes</option>
               <option value="name">Nombre</option>
@@ -571,11 +571,11 @@ export default function DeliveryMenPage() {
                   title={
                     locationEnabled
                       ? "Ver ubicación en tiempo real"
-                      : "Disponible solo cuando el repartidor está en línea"
+                      : "Disponible cuando el repartidor está en línea o en reparto"
                   }
                   className={`w-full flex items-center justify-center gap-1 py-2 text-xs font-medium border-t border-gray-100 transition-colors ${
                     locationEnabled
-                      ? "text-violet-600 hover:bg-violet-50"
+                      ? "text-dobby-600 hover:bg-dobby-50"
                       : "text-gray-400 cursor-not-allowed bg-gray-50/80"
                   }`}
                 >
@@ -619,7 +619,7 @@ export default function DeliveryMenPage() {
                         onClick={() => setPage(n)}
                         className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-medium ${
                           n === currentPage
-                            ? "bg-violet-600 text-white"
+                            ? "bg-dobby-600 text-white"
                             : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                       >
@@ -721,7 +721,7 @@ export default function DeliveryMenPage() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={(e) => e.target.files?.[0] && handleProfilePhotoUpload(e.target.files[0])}
                   disabled={profilePhotoUploading}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700"
                 />
                 {profilePhotoUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
                 {form.profilePhotoUrl && (
@@ -746,7 +746,7 @@ export default function DeliveryMenPage() {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400 outline-none"
                   required
                 />
               </div>
@@ -756,7 +756,7 @@ export default function DeliveryMenPage() {
                   type="tel"
                   value={form.celphone}
                   onChange={(e) => setForm((f) => ({ ...f, celphone: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -764,7 +764,7 @@ export default function DeliveryMenPage() {
                 <input
                   value={form.address}
                   onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                 />
               </div>
               {modal === "create" ? (
@@ -775,7 +775,7 @@ export default function DeliveryMenPage() {
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 outline-none"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                       required
                     />
                   </div>
@@ -785,7 +785,7 @@ export default function DeliveryMenPage() {
                       type="password"
                       value={form.password}
                       onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 outline-none"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                       required
                       minLength={6}
                     />
@@ -810,7 +810,7 @@ export default function DeliveryMenPage() {
                       onChange={(e) =>
                         setForm((f) => ({ ...f, status: e.target.value as DeliveryStatus }))
                       }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500/30 outline-none"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                     >
                       <option value="OFFLINE">Desconectado</option>
                       <option value="ONLINE">En línea</option>
@@ -828,7 +828,7 @@ export default function DeliveryMenPage() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={(e) => e.target.files?.[0] && handleIdUpload("front", e.target.files[0])}
                   disabled={idFrontUploading}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700"
                 />
                 {idFrontUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
                 {form.idImageFrontUrl && (
@@ -856,7 +856,7 @@ export default function DeliveryMenPage() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={(e) => e.target.files?.[0] && handleIdUpload("back", e.target.files[0])}
                   disabled={idBackUploading}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700"
                 />
                 {idBackUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
                 {form.idImageBackUrl && (
@@ -885,7 +885,7 @@ export default function DeliveryMenPage() {
                     <input
                       value={form.referenceName}
                       onChange={(e) => setForm((f) => ({ ...f, referenceName: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500/30"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-dobby-500/30"
                     />
                   </div>
                   <div>
@@ -894,7 +894,7 @@ export default function DeliveryMenPage() {
                       type="tel"
                       value={form.referencePhone}
                       onChange={(e) => setForm((f) => ({ ...f, referencePhone: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500/30"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-dobby-500/30"
                     />
                   </div>
                   <div className="sm:col-span-2">
@@ -902,7 +902,7 @@ export default function DeliveryMenPage() {
                     <input
                       value={form.referenceAddress}
                       onChange={(e) => setForm((f) => ({ ...f, referenceAddress: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500/30"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-dobby-500/30"
                     />
                   </div>
                 </div>
@@ -911,7 +911,7 @@ export default function DeliveryMenPage() {
               <div className="sm:col-span-2 flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2 rounded-lg font-medium transition-colors"
+                  className="bg-dobby-600 hover:bg-dobby-700 text-white px-5 py-2 rounded-lg font-medium transition-colors"
                 >
                   {modal === "create" ? "Crear repartidor" : "Guardar"}
                 </button>

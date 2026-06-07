@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: "bg-sky-50 text-sky-800 ring-sky-200/80",
   PREPARING: "bg-orange-50 text-orange-800 ring-orange-200/80",
   READY_FOR_PICKUP: "bg-teal-50 text-teal-800 ring-teal-200/80",
-  ASSIGNED: "bg-violet-50 text-violet-800 ring-violet-200/80",
+  ASSIGNED: "bg-dobby-50 text-dobby-800 ring-dobby-200/80",
   ON_DELIVERY: "bg-indigo-50 text-indigo-800 ring-indigo-200/80",
   DELIVERED: "bg-emerald-50 text-emerald-800 ring-emerald-200/80",
   CANCELLED: "bg-gray-100 text-gray-600 ring-gray-200/80",
@@ -402,9 +402,6 @@ export default function PedidosPage() {
     return formatDate(iso);
   }
 
-  const mapMode: "ASSIGNED" | "ON_DELIVERY" =
-    tracking?.status === "ASSIGNED" ? "ASSIGNED" : "ON_DELIVERY";
-
   const driverPos =
     tracking?.deliveryMan?.lastLat != null &&
     tracking?.deliveryMan?.lastLng != null &&
@@ -413,43 +410,44 @@ export default function PedidosPage() {
       ? { lat: tracking.deliveryMan.lastLat, lng: tracking.deliveryMan.lastLng }
       : null;
 
-  const destPickup =
+  const shopPos =
     tracking?.shop?.lat != null &&
     tracking.shop.lng != null &&
     Number.isFinite(tracking.shop.lat) &&
     Number.isFinite(tracking.shop.lng)
-      ? { lat: tracking.shop.lat, lng: tracking.shop.lng }
+      ? {
+          lat: tracking.shop.lat,
+          lng: tracking.shop.lng,
+          name: tracking.shop.name,
+        }
       : null;
 
-  const destDelivery =
+  const customerPos =
     tracking?.delivery?.lat != null &&
     tracking.delivery.lng != null &&
     Number.isFinite(tracking.delivery.lat) &&
     Number.isFinite(tracking.delivery.lng)
-      ? { lat: tracking.delivery.lat, lng: tracking.delivery.lng }
+      ? {
+          lat: tracking.delivery.lat,
+          lng: tracking.delivery.lng,
+          address: tracking.delivery.address ?? undefined,
+        }
       : null;
 
-  const destination = mapMode === "ASSIGNED" ? destPickup : destDelivery;
-  const destinationLabel =
-    mapMode === "ASSIGNED"
-      ? tracking?.shop
-        ? `Recogida: ${tracking.shop.name}`
-        : "Recogida (tienda)"
-      : "Cliente (entrega)";
-
   const mapFitBoundsKey = tracking
-    ? `${tracking.id}|${mapMode}|${destination?.lat ?? ""}|${destination?.lng ?? ""}|${driverPos ? 1 : 0}`
+    ? `${tracking.id}|${shopPos?.lat ?? ""}|${shopPos?.lng ?? ""}|${customerPos?.lat ?? ""}|${customerPos?.lng ?? ""}|${driverPos ? 1 : 0}`
     : "";
 
   const showPickupAddressNote =
-    mapMode === "ASSIGNED" &&
     tracking?.shop?.address?.trim() &&
     (tracking.shop.lat == null || tracking.shop.lng == null);
 
   const showDeliveryAddressNote =
-    mapMode === "ON_DELIVERY" &&
     tracking?.delivery.address?.trim() &&
     (tracking.delivery.lat == null || tracking.delivery.lng == null);
+
+  const showDriverLocationNote =
+    tracking?.deliveryMan != null && driverPos == null;
 
   const trackingOnMap =
     tracking?.status === "ASSIGNED" || tracking?.status === "ON_DELIVERY";
@@ -485,7 +483,7 @@ export default function PedidosPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 min-w-[9rem]"
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400 min-w-[9rem]"
             >
               <option value="">Todos</option>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -499,7 +497,7 @@ export default function PedidosPage() {
             type="button"
             onClick={exportCsv}
             disabled={filteredOrders.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold px-4 py-2 shadow-sm transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-dobby-600 hover:bg-dobby-700 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold px-4 py-2 shadow-sm transition-colors"
           >
             <IconExport className="w-4 h-4" />
             Exportar
@@ -517,7 +515,7 @@ export default function PedidosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar pedido, cliente o restaurante…"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50/80 pl-10 pr-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-400 focus:bg-white"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50/80 pl-10 pr-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-dobby-500/25 focus:border-dobby-400 focus:bg-white"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -544,7 +542,7 @@ export default function PedidosPage() {
               <select
                 value={shopFilter}
                 onChange={(e) => setShopFilter(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50/80 pl-10 pr-8 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-400 focus:bg-white"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50/80 pl-10 pr-8 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-dobby-500/25 focus:border-dobby-400 focus:bg-white"
               >
                 <option value="">Todos los restaurantes</option>
                 {shops.map((s) => (
@@ -582,7 +580,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("")}
               className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${
                 statusFilter === ""
-                  ? "bg-violet-600 text-white ring-violet-600"
+                  ? "bg-dobby-600 text-white ring-dobby-600"
                   : "bg-white text-gray-600 ring-gray-200 hover:bg-gray-50"
               }`}
             >
@@ -595,7 +593,7 @@ export default function PedidosPage() {
                 onClick={() => setStatusFilter(value)}
                 className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${
                   statusFilter === value
-                    ? "bg-violet-600 text-white ring-violet-600"
+                    ? "bg-dobby-600 text-white ring-dobby-600"
                     : `${STATUS_COLORS[value] ?? "bg-gray-100 text-gray-700 ring-gray-200"} hover:opacity-90`
                 }`}
               >
@@ -643,18 +641,31 @@ export default function PedidosPage() {
                   const trackable = canOpenTrackingModal(order.status);
                   const dmStatus = order.deliveryMan?.status?.toUpperCase() ?? "";
                   return (
-                    <tr key={order.id} className="hover:bg-violet-50/30 transition-colors">
+                    <tr key={order.id} className="hover:bg-dobby-50/30 transition-colors">
                       <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-nowrap">
                         {formatDate(order.createdAt)}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                            STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700 ring-gray-200"
-                          }`}
-                        >
-                          {STATUS_LABELS[order.status] ?? order.status}
-                        </span>
+                        {trackable ? (
+                          <button
+                            type="button"
+                            onClick={() => setTrackingOrderId(order.id)}
+                            title="Ver mapa: repartidor, restaurante y cliente"
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset cursor-pointer transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-dobby-500/50 ${
+                              STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700 ring-gray-200"
+                            }`}
+                          >
+                            {STATUS_LABELS[order.status] ?? order.status}
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                              STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700 ring-gray-200"
+                            }`}
+                          >
+                            {STATUS_LABELS[order.status] ?? order.status}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-sm font-semibold text-gray-900 whitespace-nowrap">
                         {formatMoney(order.total)}
@@ -770,7 +781,7 @@ export default function PedidosPage() {
                     setPageSize(Number(e.target.value));
                     setPage(1);
                   }}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/25"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/25"
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>
@@ -803,7 +814,7 @@ export default function PedidosPage() {
                       onClick={() => setPage(pageNum)}
                       className={`min-w-[2.25rem] h-9 rounded-lg text-sm font-medium ${
                         safePage === pageNum
-                          ? "bg-violet-600 text-white"
+                          ? "bg-dobby-600 text-white"
                           : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -870,27 +881,38 @@ export default function PedidosPage() {
                   </div>
                   {showPickupAddressNote ? (
                     <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      Dirección de recogida (sin pin): <strong>{tracking.shop?.address}</strong>
+                      Restaurante sin pin en el mapa: <strong>{tracking.shop?.address}</strong>
                     </p>
                   ) : null}
                   {showDeliveryAddressNote ? (
                     <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      Dirección de entrega (sin pin): <strong>{tracking.delivery.address}</strong>
+                      Cliente sin pin en el mapa: <strong>{tracking.delivery.address}</strong>
+                    </p>
+                  ) : null}
+                  {showDriverLocationNote ? (
+                    <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      El repartidor aún no ha enviado ubicación desde DobbyGo.
                     </p>
                   ) : null}
                   <OrderTrackingMap
-                    mode={mapMode}
                     driver={driverPos}
-                    destination={destination}
-                    destinationLabel={destinationLabel}
+                    shop={shopPos}
+                    customer={customerPos}
                     fitBoundsKey={mapFitBoundsKey}
                   />
-                  <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                  <div className="grid sm:grid-cols-3 gap-4 pt-2">
+                    <div className="rounded-lg border border-gray-200 p-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Restaurante</h3>
+                      <p className="text-sm font-medium">{tracking.shop?.name ?? "—"}</p>
+                      {tracking.shop?.address ? (
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-3">{tracking.shop.address}</p>
+                      ) : null}
+                    </div>
                     <div className="rounded-lg border border-gray-200 p-4">
                       <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Cliente</h3>
                       <p className="text-sm font-medium">{customerName(tracking.customer)}</p>
-                      {tracking.customer?.email ? (
-                        <p className="text-sm text-gray-600 mt-1">{tracking.customer.email}</p>
+                      {tracking.delivery.address ? (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{tracking.delivery.address}</p>
                       ) : null}
                     </div>
                     <div className="rounded-lg border border-gray-200 p-4">
