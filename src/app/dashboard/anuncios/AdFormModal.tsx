@@ -167,22 +167,17 @@ function formatRange(min: number, max: number): string {
 }
 
 function estimatePerformance(priority: number, placement: AdPlacement) {
-  const baseViews: Record<AdPlacement, number> = {
-    HOME_CAROUSEL: 12000,
-    HOME_BANNER: 9000,
-    PROMOTIONS: 7000,
-    CHECKOUT: 4500,
+  const baseClicks: Record<AdPlacement, number> = {
+    HOME_CAROUSEL: 480,
+    HOME_BANNER: 360,
+    PROMOTIONS: 280,
+    CHECKOUT: 180,
   };
   const mult = 1 + priority * 0.22;
-  const views = baseViews[placement] * mult;
-  const ctr = 0.04 + priority * 0.012;
-  const viewsMin = Math.round(views * 0.85);
-  const viewsMax = Math.round(views * 1.15);
-  const clicksMin = Math.round(viewsMin * ctr);
-  const clicksMax = Math.round(viewsMax * (ctr + 0.015));
-  const ctrMin = Math.round(ctr * 100);
-  const ctrMax = Math.round((ctr + 0.015) * 100);
-  return { viewsMin, viewsMax, clicksMin, clicksMax, ctrMin, ctrMax };
+  const clicks = baseClicks[placement] * mult;
+  const clicksMin = Math.round(clicks * 0.85);
+  const clicksMax = Math.round(clicks * 1.15);
+  return { clicksMin, clicksMax };
 }
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -281,20 +276,6 @@ function IconSave({ className }: { className?: string }) {
   );
 }
 
-function IconEye({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.75}
-        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-      />
-    </svg>
-  );
-}
-
 function IconCursor({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
@@ -304,14 +285,6 @@ function IconCursor({ className }: { className?: string }) {
         strokeWidth={1.75}
         d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"
       />
-    </svg>
-  );
-}
-
-function IconTrend({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   );
 }
@@ -1096,29 +1069,11 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                   <div className="border-t border-gray-100 pt-4 space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500 flex items-center gap-1.5">
-                        <IconEye className="w-4 h-4 text-gray-400" />
-                        Vistas estimadas
-                      </span>
-                      <span className="font-semibold text-gray-900 tabular-nums">
-                        {formatRange(estimates.viewsMin, estimates.viewsMax)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 flex items-center gap-1.5">
                         <IconCursor className="w-4 h-4 text-gray-400" />
                         Clics estimados
                       </span>
                       <span className="font-semibold text-gray-900 tabular-nums">
                         {formatRange(estimates.clicksMin, estimates.clicksMax)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 flex items-center gap-1.5">
-                        <IconTrend className="w-4 h-4 text-gray-400" />
-                        CTR estimado
-                      </span>
-                      <span className="font-semibold text-gray-900 tabular-nums">
-                        {estimates.ctrMin}% - {estimates.ctrMax}%
                       </span>
                     </div>
                   </div>

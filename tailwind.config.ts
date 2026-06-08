@@ -1,18 +1,5 @@
 import type { Config } from "tailwindcss";
-
-/** Tailwind scale aligned with Dobby mobile (`DobbyColors`). */
-const dobby = {
-  50: "#F0F4FF",
-  100: "#E0E9FF",
-  200: "#C2D4FF",
-  300: "#94B4FF",
-  400: "#5C8FFF",
-  500: "#3380FF",
-  600: "#0061FF",
-  700: "#004ECC",
-  800: "#1D2B4F",
-  900: "#15223D",
-};
+import { DOBBY_PURE_SCALE, DOBBY_TAILWIND_SCALE } from "./dobbyPalette";
 
 export default {
   content: [
@@ -23,7 +10,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        dobby,
+        dobby: { ...DOBBY_TAILWIND_SCALE },
+        "dobby-pure": { ...DOBBY_PURE_SCALE },
         "dobby-accent": {
           DEFAULT: "#00C2A8",
           light: "#E6FAF6",
@@ -35,7 +23,7 @@ export default {
         },
       },
       backgroundColor: {
-        "dobby-page": dobby[50],
+        "dobby-page": DOBBY_PURE_SCALE.fog,
       },
     },
   },

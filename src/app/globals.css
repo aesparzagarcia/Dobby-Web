@@ -3,11 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --dobby-primary: #0061ff;
+  /* Escala pura */
+  --dobby-onyx: #0d0d0d;
+  --dobby-carbon: #1f1f1f;
+  --dobby-graphite: #3a3a3a;
+  --dobby-ash: #8a8a8a;
+  --dobby-mist: #e8e8e8;
+  --dobby-fog: #f5f5f5;
+  --dobby-pure: #ffffff;
+
+  /* Tokens semánticos */
+  --dobby-primary: var(--dobby-onyx);
+  --dobby-on-primary: var(--dobby-pure);
   --dobby-accent: #00c2a8;
-  --dobby-light: #f0f4ff;
-  --dobby-dark: #1d2b4f;
+  --dobby-light: var(--dobby-fog);
+  --dobby-dark: var(--dobby-onyx);
   --dobby-warning: #ffb800;
+  --dobby-text-primary: var(--dobby-onyx);
+  --dobby-text-secondary: var(--dobby-ash);
+  --dobby-screen-background: var(--dobby-fog);
+  --dobby-card-surface: var(--dobby-pure);
+  --dobby-divider: var(--dobby-mist);
 }
 
 @layer components {

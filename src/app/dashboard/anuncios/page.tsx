@@ -27,7 +27,6 @@ type Ad = {
   category: string | null;
   status: AdStatus;
   isActive: boolean;
-  viewsCount: number;
   clicksCount: number;
   conversionsCount: number;
   amountPaid: number | string | null;
@@ -45,7 +44,7 @@ type Ad = {
 };
 
 type FilterTab = "todos" | "activos" | "programados" | "pausados" | "finalizados";
-type SortOption = "recent" | "oldest" | "views" | "clicks" | "priority";
+type SortOption = "recent" | "oldest" | "clicks" | "priority";
 type DisplayStatus = "activo" | "programado" | "pausado" | "finalizado";
 
 const PAGE_SIZE = 4;
@@ -85,11 +84,6 @@ function formatPeriod(start: string | null, end: string | null): string {
   if (start) return `Desde ${fmt(start)}`;
   if (end) return `Hasta ${fmt(end)}`;
   return "Sin límite";
-}
-
-function computeCtr(views: number, clicks: number): string {
-  if (views <= 0) return "0%";
-  return `${((clicks / views) * 100).toFixed(1)}%`;
 }
 
 function parseAmount(v: number | string | null | undefined): number {
@@ -142,7 +136,6 @@ function normalizeAd(raw: Record<string, unknown>): Ad {
     category: (raw.category as string | null) ?? null,
     status: (raw.status as AdStatus) ?? (raw.isActive ? "ACTIVE" : "PAUSED"),
     isActive: raw.isActive !== false && raw.status !== "PAUSED",
-    viewsCount: Number(raw.viewsCount ?? 0),
     clicksCount: Number(raw.clicksCount ?? 0),
     conversionsCount: Number(raw.conversionsCount ?? 0),
     amountPaid: (raw.amountPaid as number | string | null) ?? null,
@@ -168,20 +161,6 @@ function IconMegaphone({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={1.75}
         d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
-      />
-    </svg>
-  );
-}
-
-function IconEye({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.75}
-        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
       />
     </svg>
   );
@@ -290,14 +269,6 @@ function IconCalendar({ className }: { className?: string }) {
   );
 }
 
-function IconTrend({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  );
-}
-
 function KpiCard({
   label,
   value,
@@ -378,10 +349,9 @@ export default function AnunciosPage() {
 
   const kpis = useMemo(() => {
     const activeCount = ads.filter((ad) => getDisplayStatus(ad) === "activo").length;
-    const totalViews = ads.reduce((s, ad) => s + ad.viewsCount, 0);
     const totalClicks = ads.reduce((s, ad) => s + ad.clicksCount, 0);
     const totalRevenue = ads.reduce((s, ad) => s + parseAmount(ad.amountPaid), 0);
-    return { activeCount, totalViews, totalClicks, totalRevenue };
+    return { activeCount, totalClicks, totalRevenue };
   }, [ads]);
 
   const filteredAds = useMemo(() => {
@@ -398,8 +368,6 @@ export default function AnunciosPage() {
       switch (sort) {
         case "oldest":
           return a.createdAt.localeCompare(b.createdAt);
-        case "views":
-          return b.viewsCount - a.viewsCount;
         case "clicks":
           return b.clicksCount - a.clicksCount;
         case "priority":
@@ -490,20 +458,13 @@ export default function AnunciosPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         <KpiCard
           label="Activos"
           value={String(kpis.activeCount)}
           subtitle="campañas activas"
           icon={<IconMegaphone className="w-5 h-5" />}
           iconBg="bg-blue-100 text-blue-600"
-        />
-        <KpiCard
-          label="Vistas"
-          value={formatNumber(kpis.totalViews)}
-          subtitle="total acumulado"
-          icon={<IconEye className="w-5 h-5" />}
-          iconBg="bg-violet-100 text-violet-600"
         />
         <KpiCard
           label="Clicks"
@@ -556,7 +517,6 @@ export default function AnunciosPage() {
           >
             <option value="recent">Más recientes</option>
             <option value="oldest">Más antiguos</option>
-            <option value="views">Más vistas</option>
             <option value="clicks">Más clicks</option>
             <option value="priority">Mayor prioridad</option>
           </select>
@@ -627,21 +587,11 @@ export default function AnunciosPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2 py-3 border-y border-gray-100 mb-4">
-                    <AdMetric
-                      icon={<IconEye className="w-3.5 h-3.5" />}
-                      value={formatNumber(ad.viewsCount)}
-                      label="Vistas"
-                    />
+                  <div className="grid grid-cols-2 gap-2 py-3 border-y border-gray-100 mb-4">
                     <AdMetric
                       icon={<IconCursor className="w-3.5 h-3.5" />}
                       value={formatNumber(ad.clicksCount)}
                       label="Clicks"
-                    />
-                    <AdMetric
-                      icon={<IconTrend className="w-3.5 h-3.5" />}
-                      value={computeCtr(ad.viewsCount, ad.clicksCount)}
-                      label="CTR"
                     />
                     <AdMetric
                       icon={<IconCalendar className="w-3.5 h-3.5" />}
@@ -766,22 +716,12 @@ export default function AnunciosPage() {
             <p className="text-sm text-gray-500 mb-5">{statsAd.advertiserName}</p>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div className="bg-gray-50 rounded-xl p-3">
-                <dt className="text-gray-500">Vistas</dt>
-                <dd className="text-xl font-bold tabular-nums">{formatNumber(statsAd.viewsCount)}</dd>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3">
                 <dt className="text-gray-500">Clicks</dt>
                 <dd className="text-xl font-bold tabular-nums">{formatNumber(statsAd.clicksCount)}</dd>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
                 <dt className="text-gray-500">Conversiones</dt>
                 <dd className="text-xl font-bold tabular-nums">{formatNumber(statsAd.conversionsCount)}</dd>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3">
-                <dt className="text-gray-500">CTR</dt>
-                <dd className="text-xl font-bold tabular-nums">
-                  {computeCtr(statsAd.viewsCount, statsAd.clicksCount)}
-                </dd>
               </div>
               <div className="bg-gray-50 rounded-xl p-3 col-span-2">
                 <dt className="text-gray-500">Ingreso pagado</dt>
