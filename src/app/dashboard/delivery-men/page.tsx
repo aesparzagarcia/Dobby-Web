@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { API, authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
 
 const DriverLiveMap = dynamic(
   () => import("@/components/DriverLiveMap").then((m) => m.DriverLiveMap),
@@ -103,6 +103,9 @@ export default function DeliveryMenPage() {
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [idFrontUploading, setIdFrontUploading] = useState(false);
   const [idBackUploading, setIdBackUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const idFrontRef = useRef<HTMLInputElement>(null);
   const idBackRef = useRef<HTMLInputElement>(null);
@@ -222,7 +225,33 @@ export default function DeliveryMenPage() {
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
+  function validateDeliveryForm(isCreate: boolean): string | null {
+    const name = form.name.trim();
+    if (!name) return "El nombre es obligatorio.";
+    if (isCreate) {
+      const email = form.email.trim();
+      if (!email) return "El correo es obligatorio.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return "Ingresa un correo válido (ej. repartidor@ejemplo.com).";
+      }
+      if (!form.password) return "La contraseña inicial es obligatoria.";
+      if (form.password.length < 6) {
+        return "La contraseña debe tener al menos 6 caracteres.";
+      }
+    }
+    const celphone = form.celphone.trim();
+    if (isCreate && !celphone) {
+      return "El celular es obligatorio: el repartidor inicia sesión en la app con OTP por SMS.";
+    }
+    if (profilePhotoUploading || idFrontUploading || idBackUploading) {
+      return "Espera a que terminen de subirse las imágenes antes de guardar.";
+    }
+    return null;
+  }
+
   function openEdit(d: DeliveryMan) {
+    setFormError(null);
+    setSuccessMessage(null);
     setEditId(d.id);
     setForm({
       name: d.name || "",
@@ -244,6 +273,8 @@ export default function DeliveryMenPage() {
   }
 
   function openCreate() {
+    setFormError(null);
+    setSuccessMessage(null);
     setModal("create");
     setEditId(null);
     setForm({ ...defaultForm, status: "OFFLINE" });
@@ -267,56 +298,86 @@ export default function DeliveryMenPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (editId) {
-      const res = await fetch(apiPath(`/api/delivery-men/${editId}`), {
-        method: "PUT",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          name: form.name,
-          profilePhotoUrl: form.profilePhotoUrl || null,
-          address: form.address || undefined,
-          celphone: form.celphone || undefined,
-          idImageFrontUrl: form.idImageFrontUrl || null,
-          idImageBackUrl: form.idImageBackUrl || null,
-          referenceName: form.referenceName || undefined,
-          referencePhone: form.referencePhone || undefined,
-          referenceAddress: form.referenceAddress || undefined,
-          status: form.status,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || "Error al guardar");
-        return;
-      }
-    } else {
-      const res = await fetch(apiPath("/api/delivery-men"), {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-          name: form.name,
-          profilePhotoUrl: form.profilePhotoUrl || undefined,
-          address: form.address || undefined,
-          celphone: form.celphone || undefined,
-          idImageFrontUrl: form.idImageFrontUrl || undefined,
-          idImageBackUrl: form.idImageBackUrl || undefined,
-          referenceName: form.referenceName || undefined,
-          referencePhone: form.referencePhone || undefined,
-          referenceAddress: form.referenceAddress || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || "Error al crear repartidor");
-        return;
-      }
+    setFormError(null);
+
+    if (!getToken()) {
+      setFormError("Sesión expirada. Cierra sesión e inicia de nuevo.");
+      return;
     }
-    setModal("closed");
-    setEditId(null);
-    setForm(defaultForm);
-    load();
+    if (!API && typeof window !== "undefined") {
+      setFormError(
+        "El panel no tiene configurada NEXT_PUBLIC_API_URL. En Render, añádela al frontend y vuelve a desplegar."
+      );
+      return;
+    }
+
+    const validationError = validateDeliveryForm(!editId);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editId) {
+        const res = await fetch(apiPath(`/api/delivery-men/${editId}`), {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            name: form.name.trim(),
+            profilePhotoUrl: form.profilePhotoUrl || null,
+            address: form.address || undefined,
+            celphone: form.celphone || undefined,
+            idImageFrontUrl: form.idImageFrontUrl || null,
+            idImageBackUrl: form.idImageBackUrl || null,
+            referenceName: form.referenceName || undefined,
+            referencePhone: form.referencePhone || undefined,
+            referenceAddress: form.referenceAddress || undefined,
+            status: form.status,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setFormError(typeof data?.error === "string" ? data.error : "Error al guardar");
+          return;
+        }
+        setSuccessMessage("Repartidor actualizado.");
+      } else {
+        const res = await fetch(apiPath("/api/delivery-men"), {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            email: form.email.trim(),
+            password: form.password,
+            name: form.name.trim(),
+            profilePhotoUrl: form.profilePhotoUrl || undefined,
+            address: form.address || undefined,
+            celphone: form.celphone.trim(),
+            idImageFrontUrl: form.idImageFrontUrl || undefined,
+            idImageBackUrl: form.idImageBackUrl || undefined,
+            referenceName: form.referenceName || undefined,
+            referencePhone: form.referencePhone || undefined,
+            referenceAddress: form.referenceAddress || undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setFormError(typeof data?.error === "string" ? data.error : "Error al crear repartidor");
+          return;
+        }
+        setSuccessMessage("Repartidor creado correctamente.");
+      }
+      setModal("closed");
+      setEditId(null);
+      setForm(defaultForm);
+      load();
+    } catch {
+      setFormError(
+        "No se pudo conectar con el servidor. Revisa NEXT_PUBLIC_API_URL y CORS_ORIGINS en Render."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleProfilePhotoUpload(file: File) {
@@ -411,6 +472,12 @@ export default function DeliveryMenPage() {
           Añadir repartidor
         </button>
       </div>
+
+      {successMessage && (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {successMessage}
+        </div>
+      )}
 
       <div className="mt-6 flex flex-col lg:flex-row gap-3 lg:items-center">
         <div className="relative flex-1 max-w-md">
@@ -712,7 +779,12 @@ export default function DeliveryMenPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               {modal === "create" ? "Nuevo repartidor" : "Editar repartidor"}
             </h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleSubmit} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {formError && (
+                <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">Foto de perfil</label>
                 <input
@@ -747,17 +819,24 @@ export default function DeliveryMenPage() {
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400 outline-none"
-                  required
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Celular</label>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Celular {modal === "create" ? <span className="text-red-600">*</span> : null}
+                </label>
                 <input
                   type="tel"
                   value={form.celphone}
                   onChange={(e) => setForm((f) => ({ ...f, celphone: e.target.value }))}
+                  placeholder="ej. +52 55 1234 5678"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                 />
+                {modal === "create" && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Obligatorio: la app repartidor inicia sesión con OTP a este número.
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">Dirección</label>
@@ -776,7 +855,7 @@ export default function DeliveryMenPage() {
                       value={form.email}
                       onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
-                      required
+                      autoComplete="off"
                     />
                   </div>
                   <div>
@@ -786,9 +865,9 @@ export default function DeliveryMenPage() {
                       value={form.password}
                       onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
-                      required
-                      minLength={6}
+                      autoComplete="new-password"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres.</p>
                   </div>
                 </>
               ) : (
@@ -911,16 +990,23 @@ export default function DeliveryMenPage() {
               <div className="sm:col-span-2 flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="bg-dobby-600 hover:bg-dobby-700 text-white px-5 py-2 rounded-lg font-medium transition-colors"
+                  disabled={saving}
+                  className="bg-dobby-600 hover:bg-dobby-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors"
                 >
-                  {modal === "create" ? "Crear repartidor" : "Guardar"}
+                  {saving
+                    ? "Guardando…"
+                    : modal === "create"
+                      ? "Crear repartidor"
+                      : "Guardar"}
                 </button>
                 <button
                   type="button"
+                  disabled={saving}
                   onClick={() => {
                     setModal("closed");
                     setEditId(null);
                     setForm(defaultForm);
+                    setFormError(null);
                   }}
                   className="border border-gray-200 px-5 py-2 rounded-lg hover:bg-gray-50 text-gray-700"
                 >
