@@ -1,6 +1,6 @@
 /** Iconos del menú lateral del dashboard (estilo Dobby). */
 
-import { DOBBY_COLORS } from "@/lib/dobbyBrand";
+import Image from "next/image";
 
 const NAV_ICON = "w-[18px] h-[18px] shrink-0";
 
@@ -85,15 +85,39 @@ export function IconStats({ className = NAV_ICON }: { className?: string }) {
   );
 }
 
+export function IconNotifications({ className = NAV_ICON }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  );
+}
+
+export function IconMenu({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+export function IconClose({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
 export function IconDobbyLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden>
-      <rect width="32" height="32" rx="8" fill={DOBBY_COLORS.primary} />
-      <circle cx="11" cy="14" r="2" fill="white" />
-      <circle cx="21" cy="14" r="2" fill="white" />
-      <path d="M10 19c2 2 10 2 12 0" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16 6v3" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="16" cy="5" r="1.5" fill="white" />
-    </svg>
+    <Image
+      src="/ic_dobby.png"
+      alt="Dobby"
+      width={32}
+      height={32}
+      className={`${className} rounded-lg object-contain`}
+      priority
+    />
   );
 }

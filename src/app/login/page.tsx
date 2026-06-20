@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPath } from "@/lib/api";
+import { IconDobbyLogo } from "@/components/dashboard/NavIcons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,9 +42,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-dobby-page p-4">
       <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-xl font-semibold text-center mb-4">
-          Ewe Delivery — Admin
-        </h1>
+        <div className="flex flex-col items-center gap-2 mb-6">
+          <IconDobbyLogo className="w-12 h-12" />
+          <h1 className="text-xl font-semibold text-center">Dobby — Admin</h1>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

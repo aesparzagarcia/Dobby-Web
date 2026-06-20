@@ -472,7 +472,7 @@ export default function ConfiguracionPage() {
         <SummaryCard
           label="Demanda actual"
           value={`×${demandMultiplier}`}
-          accentClass="bg-violet-100 text-violet-600"
+          accentClass="bg-dobby-100 text-dobby-600"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -579,12 +579,12 @@ export default function ConfiguracionPage() {
           }
           aside={
             <div>
-              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-3">
+              <p className="text-xs font-semibold text-dobby-600 uppercase tracking-wide mb-3">
                 Ejemplo de cálculo
               </p>
               <p className="text-sm text-gray-700">
                 Un envío de {formatMoney(exampleDemand.base)} costará:{" "}
-                <strong className="text-violet-700">{formatMoney(exampleDemand.total)}</strong>{" "}
+                <strong className="text-dobby-700">{formatMoney(exampleDemand.total)}</strong>{" "}
                 <span className="text-gray-500">
                   ({formatMoney(exampleDemand.base)} × {exampleDemand.mult})
                 </span>
@@ -595,7 +595,7 @@ export default function ConfiguracionPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>1.0</span>
-              <span className="inline-flex px-3 py-1 rounded-full bg-violet-100 text-violet-700 font-semibold text-sm">
+              <span className="inline-flex px-3 py-1 rounded-full bg-dobby-100 text-dobby-700 font-semibold text-sm">
                 Actual: ×{demandMultiplier}
               </span>
               <span>1.5</span>
@@ -612,7 +612,7 @@ export default function ConfiguracionPage() {
                   DEFAULT_DEMAND_MULTIPLIER: e.target.value,
                 }))
               }
-              className="w-full h-2 rounded-full appearance-none bg-violet-100 accent-violet-600 cursor-pointer"
+              className="w-full h-2 rounded-full appearance-none bg-dobby-100 accent-dobby-600 cursor-pointer"
             />
             <p className="text-xs text-gray-500">
               1.0 = normal · 1.2 = +20% en horas pico

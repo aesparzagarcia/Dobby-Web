@@ -5,6 +5,10 @@ import "leaflet/dist/leaflet.css";
 export const metadata: Metadata = {
   title: "Dobby — Admin",
   description: "Delivery platform admin dashboard",
+  icons: {
+    icon: "/ic_dobby.png",
+    apple: "/ic_dobby.png",
+  },
 };
 
 export default function RootLayout({

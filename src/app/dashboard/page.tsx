@@ -62,7 +62,7 @@ export default function DashboardOverview() {
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-sm text-gray-500">Repartidores</p>
           <p className="text-xl font-semibold">{counts?.delivery ?? "—"}</p>
-          <Link href="/dashboard/delivery-men" className="text-sm text-dobby-600 hover:underline">
+          <Link href="/dashboard/repartidores" className="text-sm text-dobby-600 hover:underline">
             Ver →
           </Link>
         </div>
