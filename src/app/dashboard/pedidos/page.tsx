@@ -891,7 +891,7 @@ export default function PedidosPage() {
                   ) : null}
                   {showDriverLocationNote ? (
                     <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      El repartidor aún no ha enviado ubicación desde DobbyGo.
+                      El repartidor aún no ha enviado ubicación desde DobbiGo.
                     </p>
                   ) : null}
                   <OrderTrackingMap

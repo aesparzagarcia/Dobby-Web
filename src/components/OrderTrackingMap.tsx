@@ -130,7 +130,7 @@ export function OrderTrackingMap({ driver, shop, customer, fitBoundsKey }: Order
     return (
       <div className="h-[360px] flex items-center justify-center bg-gray-100 text-gray-600 text-sm px-4 text-center rounded-lg border border-gray-200">
         No hay coordenadas para mostrar el mapa. Verifica que la tienda y el cliente tengan ubicación y que el
-        repartidor haya enviado su posición desde DobbyGo.
+        repartidor haya enviado su posición desde DobbiGo.
       </div>
     );
   }

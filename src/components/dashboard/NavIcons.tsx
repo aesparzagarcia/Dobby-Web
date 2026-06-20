@@ -1,4 +1,4 @@
-/** Iconos del menú lateral del dashboard (estilo Dobby). */
+/** Iconos del menú lateral del dashboard (estilo Dobbi). */
 
 import Image from "next/image";
 
@@ -113,7 +113,7 @@ export function IconDobbyLogo({ className = "w-8 h-8" }: { className?: string })
   return (
     <Image
       src="/ic_dobby.png"
-      alt="Dobby"
+      alt="Dobbi"
       width={32}
       height={32}
       className={`${className} rounded-lg object-contain`}

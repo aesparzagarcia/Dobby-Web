@@ -104,7 +104,7 @@ export function DashboardPreRegistrationAlertsProvider({
       Notification.permission === "granted"
     ) {
       try {
-        new Notification("Nuevo pre-registro en Dobby", {
+        new Notification("Nuevo pre-registro en Dobbi", {
           body: message,
           tag: `pre-reg-${row.id}`,
         });

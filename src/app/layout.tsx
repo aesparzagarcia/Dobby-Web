@@ -3,7 +3,7 @@ import "./globals.css";
 import "leaflet/dist/leaflet.css";
 
 export const metadata: Metadata = {
-  title: "Dobby — Admin",
+  title: "Dobbi — Admin",
   description: "Delivery platform admin dashboard",
   icons: {
     icon: "/ic_dobby.png",

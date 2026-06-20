@@ -138,7 +138,7 @@ function DashboardLayoutShell({
   }
 
   const displayName =
-    [user?.name, user?.lastName].filter(Boolean).join(" ").trim() || "Admin Dobby";
+    [user?.name, user?.lastName].filter(Boolean).join(" ").trim() || "Admin Dobbi";
 
   return (
     <div className="min-h-screen flex bg-dobby-page">
@@ -166,7 +166,7 @@ function DashboardLayoutShell({
             onClick={() => setSidebarOpen(false)}
           >
             <IconDobbyLogo className="w-8 h-8 shrink-0" />
-            <span className="font-bold text-lg text-gray-900 tracking-tight">Dobby</span>
+            <span className="font-bold text-lg text-gray-900 tracking-tight">Dobbi</span>
           </Link>
           <button
             type="button"
@@ -243,7 +243,7 @@ function DashboardLayoutShell({
           </button>
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
             <IconDobbyLogo className="w-7 h-7 shrink-0" />
-            <span className="font-bold text-base text-gray-900 tracking-tight truncate">Dobby</span>
+            <span className="font-bold text-base text-gray-900 tracking-tight truncate">Dobbi</span>
           </Link>
         </header>
         <main className="flex-1 min-w-0 overflow-auto">{children}</main>

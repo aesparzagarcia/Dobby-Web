@@ -92,7 +92,7 @@ export function DashboardOrderAlertsProvider({ children }: { children: ReactNode
 
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
       try {
-        new Notification("Nuevo pedido en Dobby", {
+        new Notification("Nuevo pedido en Dobbi", {
           body: message,
           tag: `order-${order.id}`,
         });

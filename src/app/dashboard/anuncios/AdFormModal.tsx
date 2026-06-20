@@ -571,7 +571,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                 {mode === "create" ? "Nuevo anuncio" : "Editar anuncio"}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                Crea un anuncio atractivo para promocionar tu negocio en Dobby.
+                Crea un anuncio atractivo para promocionar tu negocio en Dobbi.
               </p>
             </div>
           </div>

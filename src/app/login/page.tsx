@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col items-center gap-2 mb-6">
           <IconDobbyLogo className="w-12 h-12" />
-          <h1 className="text-xl font-semibold text-center">Dobby — Admin</h1>
+          <h1 className="text-xl font-semibold text-center">Dobbi — Admin</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -260,7 +260,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         <h3 className="text-lg font-semibold text-gray-900 mb-3">¿Cómo funciona?</h3>
         <div className="text-sm text-gray-600 space-y-3">
           <p>
-            Dobby calcula el envío así: <strong>tarifa base + (km × precio/km) + recargo de zona + lluvia</strong>,
+            Dobbi calcula el envío así: <strong>tarifa base + (km × precio/km) + recargo de zona + lluvia</strong>,
             y luego aplica el <strong>multiplicador de demanda</strong>.
           </p>
           <p>
@@ -382,7 +382,7 @@ export default function ConfiguracionPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Error al guardar");
-      setMessage("Cambios guardados. La app Dobby los tomará al refrescar el carrito.");
+      setMessage("Cambios guardados. La app Dobbi los tomará al refrescar el carrito.");
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar");
@@ -425,7 +425,7 @@ export default function ConfiguracionPage() {
               <h1 className="text-2xl font-bold text-gray-900">Tarifas de envío</h1>
             </div>
             <p className="text-sm text-gray-500 mt-2 max-w-xl">
-              Configura cómo Dobby calcula el costo de envío para los clientes.
+              Configura cómo Dobbi calcula el costo de envío para los clientes.
             </p>
           </div>
         </div>
