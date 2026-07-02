@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { isTokenExpired } from "@/lib/api";
 import {
   IconAds,
+  IconClients,
   IconClose,
   IconDashboard,
   IconDrivers,
@@ -37,6 +38,7 @@ const nav = [
   { href: "/dashboard", label: "Resumen", icon: IconDashboard, badgeKey: null as string | null },
   { href: "/dashboard/income", label: "Ingresos", icon: IconIncome, badgeKey: null },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: IconOrders, badgeKey: "orders" as const },
+  { href: "/dashboard/clientes", label: "Clientes", icon: IconClients, badgeKey: null },
   { href: "/dashboard/shops", label: "Tiendas", icon: IconShop, badgeKey: null },
   { href: "/dashboard/notificaciones", label: "Notificaciones", icon: IconNotifications, badgeKey: "notifications" as const },
   { href: "/dashboard/services", label: "Servicios", icon: IconServices, badgeKey: null },
