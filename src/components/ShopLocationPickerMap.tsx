@@ -177,11 +177,11 @@ function MapLayoutFix() {
     const t2 = window.setTimeout(fix, 400);
 
     const container = map.getContainer();
-    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimer: number | null = null;
     const observer =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
-            if (resizeTimer) window.clearTimeout(resizeTimer);
+            if (resizeTimer != null) window.clearTimeout(resizeTimer);
             resizeTimer = window.setTimeout(fix, 150);
           })
         : null;
@@ -191,7 +191,7 @@ function MapLayoutFix() {
       cancelAnimationFrame(raf);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
-      if (resizeTimer) window.clearTimeout(resizeTimer);
+      if (resizeTimer != null) window.clearTimeout(resizeTimer);
       observer?.disconnect();
     };
   }, [map]);
