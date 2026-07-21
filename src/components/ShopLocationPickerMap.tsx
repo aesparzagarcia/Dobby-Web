@@ -1,10 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 
-const MAP_OPTIONS: L.MapOptions = { inertia: false };
+import { isUsableWgs84Point } from "@/lib/geo";
+import {
+  hasValidServiceAreaPolygon,
+  isInsideServiceArea,
+  loadServiceAreaRing,
+  OUTSIDE_SERVICE_AREA_ERROR,
+} from "@/lib/serviceArea";
+
+const MAP_OPTIONS: L.MapOptions = {
+  inertia: false,
+  minZoom: 14,
+  maxZoom: 18,
+  scrollWheelZoom: false,
+  doubleClickZoom: false,
+  boxZoom: false,
+  zoomControl: true,
+};
 
 /** Igual que en Dobby Android: debounce al mover la cámara antes de geocodificar. */
 const MAP_MOVE_DEBOUNCE_MS = 550;
@@ -94,6 +110,11 @@ type MapCenterTrackerProps = {
 function MapCenterTracker({ onCenterIdle, onCenterFlush }: MapCenterTrackerProps) {
   const map = useMap();
   const moveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCenterIdleRef = useRef(onCenterIdle);
+  const onCenterFlushRef = useRef(onCenterFlush);
+
+  onCenterIdleRef.current = onCenterIdle;
+  onCenterFlushRef.current = onCenterFlush;
 
   useEffect(() => {
     const clearMoveTimer = () => {
@@ -113,14 +134,14 @@ function MapCenterTracker({ onCenterIdle, onCenterFlush }: MapCenterTrackerProps
       moveDebounceRef.current = setTimeout(() => {
         moveDebounceRef.current = null;
         const { lat, lng } = readCenter();
-        onCenterIdle(lat, lng);
+        onCenterIdleRef.current(lat, lng);
       }, MAP_MOVE_DEBOUNCE_MS);
     };
 
     const flush = () => {
       clearMoveTimer();
       const { lat, lng } = readCenter();
-      onCenterFlush(lat, lng);
+      onCenterFlushRef.current(lat, lng);
     };
 
     const onReady = () => {
@@ -136,10 +157,75 @@ function MapCenterTracker({ onCenterIdle, onCenterFlush }: MapCenterTrackerProps
       map.off("move", scheduleIdle);
       map.off("moveend", flush);
     };
-  }, [map, onCenterIdle, onCenterFlush]);
+  }, [map]);
 
   return null;
 }
+
+/** Evita saltos de zoom cuando el modal termina de medir su tamaño. */
+function MapLayoutFix() {
+  const map = useMap();
+
+  useEffect(() => {
+    const fix = () => {
+      if (!map.getContainer()?.isConnected) return;
+      map.invalidateSize({ animate: false });
+    };
+
+    const raf = requestAnimationFrame(fix);
+    const t1 = window.setTimeout(fix, 120);
+    const t2 = window.setTimeout(fix, 400);
+
+    const container = map.getContainer();
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (resizeTimer) window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(fix, 150);
+          })
+        : null;
+    observer?.observe(container);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      observer?.disconnect();
+    };
+  }, [map]);
+
+  return null;
+}
+
+type ShopLocationMapCanvasProps = {
+  initialCenter: L.LatLngTuple;
+  onCenterIdle: (lat: number, lng: number) => void;
+  onCenterFlush: (lat: number, lng: number) => void;
+};
+
+const ShopLocationMapCanvas = memo(function ShopLocationMapCanvas({
+  initialCenter,
+  onCenterIdle,
+  onCenterFlush,
+}: ShopLocationMapCanvasProps) {
+  return (
+    <MapContainer
+      center={initialCenter}
+      zoom={16}
+      className="h-full w-full"
+      {...MAP_OPTIONS}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <MapLayoutFix />
+      <MapCenterTracker onCenterIdle={onCenterIdle} onCenterFlush={onCenterFlush} />
+    </MapContainer>
+  );
+});
 
 export type ShopLocationPickerMapProps = {
   initialLat: number | null;
@@ -160,12 +246,31 @@ export function ShopLocationPickerMap({
   onClose,
 }: ShopLocationPickerMapProps) {
   const hasInitialCoords =
-    initialLat != null && initialLng != null && Number.isFinite(initialLat) && Number.isFinite(initialLng);
+    initialLat != null &&
+    initialLng != null &&
+    isUsableWgs84Point(initialLat, initialLng);
 
-  const [lat, setLat] = useState<number>(() => (hasInitialCoords ? initialLat! : fallbackCenter[0]));
-  const [lng, setLng] = useState<number>(() => (hasInitialCoords ? initialLng! : fallbackCenter[1]));
   const [addressText, setAddressText] = useState(initialAddress);
   const [geocoding, setGeocoding] = useState(false);
+  const [serviceAreaReady, setServiceAreaReady] = useState(false);
+  const [insideServiceArea, setInsideServiceArea] = useState(true);
+  const serviceAreaReadyRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadServiceAreaRing().then(() => {
+      if (cancelled) return;
+      serviceAreaReadyRef.current = true;
+      setServiceAreaReady(true);
+      const c = latestCenterRef.current;
+      if (c && hasValidServiceAreaPolygon()) {
+        setInsideServiceArea(isInsideServiceArea(c.lat, c.lng));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** Centro actual del mapa (sincronizado al mover); al aplicar se persisten estas coords en el formulario de la tienda. */
   const latestCenterRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -182,12 +287,15 @@ export function ShopLocationPickerMap({
   }
 
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeRequestIdRef = useRef(0);
 
   const queueReverseGeocode = useCallback((nextLat: number, nextLng: number, flush: boolean) => {
     const run = async () => {
       reverseTimerRef.current = null;
+      const requestId = ++geocodeRequestIdRef.current;
       setGeocoding(true);
       const name = await reverseGeocode(nextLat, nextLng);
+      if (requestId !== geocodeRequestIdRef.current) return;
       setGeocoding(false);
       if (name) setAddressText(name);
     };
@@ -204,24 +312,28 @@ export function ShopLocationPickerMap({
     }
   }, []);
 
+  const updateCenter = useCallback((nextLat: number, nextLng: number) => {
+    latestCenterRef.current = { lat: nextLat, lng: nextLng };
+    if (serviceAreaReadyRef.current && hasValidServiceAreaPolygon()) {
+      const inside = isInsideServiceArea(nextLat, nextLng);
+      setInsideServiceArea((prev) => (prev === inside ? prev : inside));
+    }
+  }, []);
+
   const onCenterIdle = useCallback(
     (nextLat: number, nextLng: number) => {
-      latestCenterRef.current = { lat: nextLat, lng: nextLng };
-      setLat(nextLat);
-      setLng(nextLng);
+      updateCenter(nextLat, nextLng);
       queueReverseGeocode(nextLat, nextLng, false);
     },
-    [queueReverseGeocode]
+    [queueReverseGeocode, updateCenter]
   );
 
   const onCenterFlush = useCallback(
     (nextLat: number, nextLng: number) => {
-      latestCenterRef.current = { lat: nextLat, lng: nextLng };
-      setLat(nextLat);
-      setLng(nextLng);
+      updateCenter(nextLat, nextLng);
       queueReverseGeocode(nextLat, nextLng, true);
     },
-    [queueReverseGeocode]
+    [queueReverseGeocode, updateCenter]
   );
 
   useEffect(() => {
@@ -234,21 +346,17 @@ export function ShopLocationPickerMap({
     <div className="flex flex-col gap-3">
       <p className="text-sm text-gray-600">
         Desplaza el mapa; el pin indica la ubicación. La dirección se actualiza según el centro del mapa.
+        Usa los botones +/− para acercar o alejar.
       </p>
-      <div className="relative h-[280px] w-full rounded-lg overflow-hidden border border-gray-200 z-0">
-        <MapContainer
-          center={initialMapCenterRef.current}
-          zoom={16}
-          className="h-full w-full"
-          scrollWheelZoom
-          {...MAP_OPTIONS}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapCenterTracker onCenterIdle={onCenterIdle} onCenterFlush={onCenterFlush} />
-        </MapContainer>
+      <div
+        className="relative h-[280px] w-full rounded-lg overflow-hidden border border-gray-200 z-0 touch-none"
+        onWheelCapture={(e) => e.stopPropagation()}
+      >
+        <ShopLocationMapCanvas
+          initialCenter={initialMapCenterRef.current}
+          onCenterIdle={onCenterIdle}
+          onCenterFlush={onCenterFlush}
+        />
         <CenterPinOverlay />
       </div>
       <div>
@@ -260,6 +368,9 @@ export function ShopLocationPickerMap({
           rows={3}
         />
         {geocoding && <p className="mt-1 text-xs text-gray-500">Buscando dirección…</p>}
+        {serviceAreaReady && hasValidServiceAreaPolygon() && !insideServiceArea && (
+          <p className="mt-2 text-xs text-red-600">{OUTSIDE_SERVICE_AREA_ERROR}</p>
+        )}
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onClose} className="border px-4 py-2 rounded hover:bg-gray-50 text-sm">
@@ -274,9 +385,20 @@ export function ShopLocationPickerMap({
               return;
             }
             const c = latestCenterRef.current!;
+            if (!isUsableWgs84Point(c.lat, c.lng)) {
+              alert("Mueve el mapa hasta colocar el pin sobre la ubicación real de la tienda.");
+              return;
+            }
+            if (serviceAreaReady && hasValidServiceAreaPolygon() && !isInsideServiceArea(c.lat, c.lng)) {
+              alert(OUTSIDE_SERVICE_AREA_ERROR);
+              return;
+            }
             onApply(c.lat, c.lng, addr);
           }}
-          className="bg-dobby-600 text-white px-4 py-2 rounded hover:bg-dobby-700 text-sm"
+          disabled={
+            serviceAreaReady && hasValidServiceAreaPolygon() && !insideServiceArea
+          }
+          className="bg-dobby-600 text-white px-4 py-2 rounded hover:bg-dobby-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Aplicar ubicación
         </button>

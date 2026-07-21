@@ -3,6 +3,13 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
+import {
+  hasValidServiceAreaPolygon,
+  isInsideServiceArea,
+  loadServiceAreaRing,
+  OUTSIDE_SERVICE_AREA_ERROR,
+} from "@/lib/serviceArea";
 
 const ShopLocationPickerMap = dynamic(
   () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
@@ -54,6 +61,10 @@ function shopHours(shop: Shop): { open: string; close: string } | null {
 
 function formatHoursRange(open: string, close: string) {
   return `${open} – ${close}`;
+}
+
+function hasValidShopLocation(lat: number | null, lng: number | null): boolean {
+  return lat != null && lng != null && isUsableWgs84Point(lat, lng);
 }
 
 function formatMoney(n: number) {
@@ -320,6 +331,9 @@ export default function ShopsPage() {
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  /** True solo tras «Aplicar ubicación» en el mapa (o al editar una tienda que ya tenía pin válido). */
+  const [locationFromMap, setLocationFromMap] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -349,6 +363,10 @@ export default function ShopsPage() {
   useEffect(() => {
     load();
   }, [statusFilter]);
+
+  useEffect(() => {
+    void loadServiceAreaRing();
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -397,6 +415,22 @@ export default function ShopsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!hasValidShopLocation(form.lat, form.lng) || !locationFromMap) {
+      setLocationError(shopLocationError());
+      setMapPickerOpen(true);
+      return;
+    }
+    if (
+      hasValidServiceAreaPolygon() &&
+      form.lat != null &&
+      form.lng != null &&
+      !isInsideServiceArea(form.lat, form.lng)
+    ) {
+      setLocationError(OUTSIDE_SERVICE_AREA_ERROR);
+      setMapPickerOpen(true);
+      return;
+    }
+    setLocationError(null);
     const url = editId ? `/api/shops/${editId}` : "/api/shops";
     const method = editId ? "PUT" : "POST";
     const body = {
@@ -420,6 +454,8 @@ export default function ShopsPage() {
     if (res.ok) {
       setModal("closed");
       setMapPickerOpen(false);
+      setLocationFromMap(false);
+      setLocationError(null);
       setEditId(null);
       setForm(emptyForm());
       load();
@@ -432,10 +468,17 @@ export default function ShopsPage() {
     setModal("create");
     setEditId(null);
     setForm(emptyForm());
+    setLocationFromMap(false);
+    setLocationError(null);
+    setMapPickerOpen(true);
   }
 
   function openEdit(shop: Shop) {
     const hours = shopHours(shop);
+    const lat =
+      shop.lat != null && Number.isFinite(Number(shop.lat)) ? Number(shop.lat) : null;
+    const lng =
+      shop.lng != null && Number.isFinite(Number(shop.lng)) ? Number(shop.lng) : null;
     setEditId(shop.id);
     setForm({
       name: shop.name,
@@ -444,11 +487,15 @@ export default function ShopsPage() {
       phone: shop.phone || "",
       logoUrl: shop.logoUrl || "",
       status: shop.status,
-      lat: shop.lat != null && Number.isFinite(Number(shop.lat)) ? Number(shop.lat) : null,
-      lng: shop.lng != null && Number.isFinite(Number(shop.lng)) ? Number(shop.lng) : null,
+      lat,
+      lng,
       openingHour: hours?.open ?? "",
       closingHour: hours?.close ?? "",
     });
+    const pinned = hasValidShopLocation(lat, lng);
+    setLocationFromMap(pinned);
+    setLocationError(pinned ? null : "Esta tienda no tiene ubicación en el mapa. Selecciónala antes de guardar.");
+    setMapPickerOpen(!pinned);
     setModal("edit");
   }
 
@@ -700,20 +747,41 @@ export default function ShopsPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="block text-sm text-gray-600 m-0">Dirección</label>
+                  <label className="block text-sm text-gray-600 m-0">
+                    Dirección <span className="text-red-600">*</span>
+                  </label>
                   <button
                     type="button"
                     onClick={() => setMapPickerOpen(true)}
                     className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
                   >
-                    Mapa
+                    {locationFromMap ? "Cambiar en mapa" : "Seleccionar en mapa"}
                   </button>
                 </div>
+                {!locationFromMap ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 mb-2">
+                    Obligatorio: abre el mapa, coloca el pin sobre la tienda y pulsa «Aplicar ubicación».
+                  </p>
+                ) : null}
+                {locationError ? (
+                  <p className="text-xs text-red-600 mb-2">{locationError}</p>
+                ) : locationFromMap && form.lat != null && form.lng != null ? (
+                  <p className="text-xs text-emerald-700 mb-2">
+                    Ubicación confirmada ({form.lat.toFixed(5)}, {form.lng.toFixed(5)})
+                  </p>
+                ) : null}
                 <input
                   value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setForm((f) => ({ ...f, address: next, lat: null, lng: null }));
+                    setLocationFromMap(false);
+                    setLocationError(null);
+                  }}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   required
+                  readOnly={locationFromMap}
+                  placeholder="Se completa al aplicar ubicación en el mapa"
                 />
               </div>
               <div>
@@ -799,7 +867,8 @@ export default function ShopsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700"
+                  disabled={!locationFromMap || !hasValidShopLocation(form.lat, form.lng)}
+                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {modal === "create" ? "Crear" : "Guardar"}
                 </button>
@@ -808,6 +877,8 @@ export default function ShopsPage() {
                   onClick={() => {
                     setModal("closed");
                     setMapPickerOpen(false);
+                    setLocationFromMap(false);
+                    setLocationError(null);
                   }}
                   className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
                 >
@@ -830,6 +901,8 @@ export default function ShopsPage() {
               onClose={() => setMapPickerOpen(false)}
               onApply={(lat, lng, address) => {
                 setForm((f) => ({ ...f, lat, lng, address }));
+                setLocationFromMap(true);
+                setLocationError(null);
                 setMapPickerOpen(false);
               }}
             />
