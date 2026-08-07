@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
 
@@ -412,7 +413,14 @@ export default function DeliveryMenPage() {
                       </svg>
                     </button>
                     {menuOpenId === d.id ? (
-                      <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                      <div className="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
+                        <Link
+                          href={`/dashboard/repartidores/${d.id}/ganancias`}
+                          className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpenId(null)}
+                        >
+                          Reporte
+                        </Link>
                         <button
                           type="button"
                           onClick={() => openEdit(d)}
@@ -460,16 +468,24 @@ export default function DeliveryMenPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => openEdit(d)}
-                  className="w-full flex items-center justify-center gap-1 py-3 text-sm font-medium text-dobby-600 hover:bg-dobby-50 border-t border-gray-100 transition-colors"
-                >
-                  Ver detalles
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
+                <div className="grid grid-cols-2 border-t border-gray-100">
+                  <Link
+                    href={`/dashboard/repartidores/${d.id}/ganancias`}
+                    className="flex items-center justify-center gap-1 py-3 text-sm font-medium text-dobby-600 hover:bg-dobby-50 border-r border-gray-100 transition-colors"
+                  >
+                    Reporte
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(d)}
+                    className="flex items-center justify-center gap-1 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Editar
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
               </article>
             ))}
           </div>

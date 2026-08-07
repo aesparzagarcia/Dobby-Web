@@ -21,6 +21,9 @@ type IncomeShop = {
   logoUrl: string | null;
   productsRevenue: number;
   deliveryRevenue: number;
+  platformCommission: number;
+  grossTotal: number;
+  totalWithDelivery: number;
   revenue: number;
   orderCount: number;
   percentOfTotal: number;
@@ -489,11 +492,11 @@ export default function IncomePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+            <div className="xl:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="text-base font-semibold text-gray-900 mb-1">Ingresos por tienda</h2>
               <p className="text-xs text-gray-500 mb-4">
-                Productos vendidos y envíos generados por cada tienda en el período.
+                Desglose por tienda: productos, envío, comisión de la app y total cobrado.
               </p>
               {data.byShop.length === 0 ? (
                 <p className="text-sm text-gray-500">No hay pedidos entregados en este período.</p>
@@ -504,74 +507,111 @@ export default function IncomePage() {
                       <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
                         <th className="pb-3 font-medium">Tienda</th>
                         <th className="pb-3 font-medium text-right">Productos</th>
-                        <th className="pb-3 font-medium text-right">Envíos</th>
+                        <th className="pb-3 font-medium text-right">Envío</th>
+                        <th className="pb-3 font-medium text-right">Comisión app</th>
+                        <th className="pb-3 font-medium text-right">Total</th>
                         <th className="pb-3 font-medium text-right">Pedidos</th>
-                        <th className="pb-3 font-medium text-right w-36">% productos</th>
+                        <th className="pb-3 font-medium text-right w-28">%</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {data.byShop.slice(0, 6).map((shop) => (
-                        <tr key={shop.shopId}>
-                          <td className="py-3 pr-2">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              {shop.logoUrl ? (
-                                <img
-                                  src={uploadsUrl(shop.logoUrl)}
-                                  alt=""
-                                  className="w-8 h-8 rounded-full object-cover bg-gray-100"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center text-xs font-bold shrink-0">
-                                  {shop.shopName.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <span className="font-medium text-gray-900 truncate">
-                                {shop.shopName}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 text-right font-medium tabular-nums text-gray-900">
-                            {formatMoney(shop.productsRevenue ?? shop.revenue)}
-                          </td>
-                          <td className="py-3 text-right font-medium tabular-nums text-sky-700">
-                            {formatMoney(shop.deliveryRevenue ?? 0)}
-                          </td>
-                          <td className="py-3 text-right text-gray-600 tabular-nums">
-                            {shop.orderCount}
-                          </td>
-                          <td className="py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-dobby-500 rounded-full"
-                                  style={{ width: `${Math.min(100, shop.percentOfTotal)}%` }}
-                                />
+                      {data.byShop.map((shop) => {
+                        const products = shop.productsRevenue ?? 0;
+                        const delivery = shop.deliveryRevenue ?? 0;
+                        const commission = shop.platformCommission ?? 0;
+                        const total =
+                          shop.grossTotal ??
+                          shop.revenue ??
+                          products + delivery + commission;
+                        return (
+                          <tr key={shop.shopId} className="hover:bg-gray-50/80">
+                            <td className="py-3 pr-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {shop.logoUrl ? (
+                                  <img
+                                    src={uploadsUrl(shop.logoUrl)}
+                                    alt=""
+                                    className="w-8 h-8 rounded-full object-cover bg-gray-100"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center text-xs font-bold shrink-0">
+                                    {shop.shopName.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="font-medium text-gray-900 truncate max-w-[160px]" title={shop.shopName}>
+                                  {shop.shopName}
+                                </span>
                               </div>
-                              <span className="text-xs text-gray-600 w-10 tabular-nums">
-                                {shop.percentOfTotal}%
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3 text-right tabular-nums text-gray-900">
+                              {formatMoney(products)}
+                            </td>
+                            <td className="py-3 text-right tabular-nums text-sky-700">
+                              {formatMoney(delivery)}
+                            </td>
+                            <td className="py-3 text-right tabular-nums text-violet-700 font-medium">
+                              {formatMoney(commission)}
+                            </td>
+                            <td className="py-3 text-right font-semibold tabular-nums text-gray-900">
+                              {formatMoney(total)}
+                            </td>
+                            <td className="py-3 text-right text-gray-600 tabular-nums">
+                              {shop.orderCount}
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-dobby-500 rounded-full"
+                                    style={{ width: `${Math.min(100, shop.percentOfTotal)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-600 w-10 tabular-nums">
+                                  {shop.percentOfTotal}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-gray-100 text-xs font-semibold text-gray-700">
-                        <td className="pt-3">Total (mostradas)</td>
-                        <td className="pt-3 text-right tabular-nums">
+                      <tr className="border-t border-gray-200 text-xs font-semibold text-gray-800 bg-gray-50/60">
+                        <td className="pt-3 pb-1">Total ({data.byShop.length} tienda{data.byShop.length !== 1 ? "s" : ""})</td>
+                        <td className="pt-3 pb-1 text-right tabular-nums">
                           {formatMoney(
-                            data.byShop
-                              .slice(0, 6)
-                              .reduce((s, shop) => s + (shop.productsRevenue ?? shop.revenue), 0)
+                            data.byShop.reduce((acc, shop) => acc + (shop.productsRevenue ?? 0), 0)
                           )}
                         </td>
-                        <td className="pt-3 text-right tabular-nums text-sky-700">
+                        <td className="pt-3 pb-1 text-right tabular-nums text-sky-700">
                           {formatMoney(
-                            data.byShop.slice(0, 6).reduce((s, shop) => s + (shop.deliveryRevenue ?? 0), 0)
+                            data.byShop.reduce((acc, shop) => acc + (shop.deliveryRevenue ?? 0), 0)
                           )}
                         </td>
-                        <td className="pt-3 text-right tabular-nums">
-                          {data.byShop.slice(0, 6).reduce((s, shop) => s + shop.orderCount, 0)}
+                        <td className="pt-3 pb-1 text-right tabular-nums text-violet-700">
+                          {formatMoney(
+                            data.byShop.reduce(
+                              (acc, shop) => acc + (shop.platformCommission ?? 0),
+                              0
+                            )
+                          )}
+                        </td>
+                        <td className="pt-3 pb-1 text-right tabular-nums">
+                          {formatMoney(
+                            data.byShop.reduce(
+                              (acc, shop) =>
+                                acc +
+                                (shop.grossTotal ??
+                                  shop.revenue ??
+                                  (shop.productsRevenue ?? 0) +
+                                    (shop.deliveryRevenue ?? 0) +
+                                    (shop.platformCommission ?? 0)),
+                              0
+                            )
+                          )}
+                        </td>
+                        <td className="pt-3 pb-1 text-right tabular-nums">
+                          {data.byShop.reduce((acc, shop) => acc + shop.orderCount, 0)}
                         </td>
                         <td />
                       </tr>
@@ -579,55 +619,50 @@ export default function IncomePage() {
                   </table>
                 </div>
               )}
-              <Link
-                href="/dashboard/shops"
-                className="inline-flex items-center gap-1 text-sm font-medium text-dobby-600 hover:text-dobby-800 mt-4"
-              >
-                Ver todas las tiendas
-                <span aria-hidden>›</span>
-              </Link>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">Desglose de ingresos</h2>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Desglose global</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                Totales del período (todas las tiendas).
+              </p>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-gray-600">
-                    Subtotal de pedidos
-                    <IconInfo className="w-3.5 h-3.5 text-gray-400" />
-                  </span>
+                  <span className="text-gray-600">Productos (subtotal)</span>
                   <span className="font-medium tabular-nums">{formatMoney(b.ordersSubtotal)}</span>
                 </li>
                 <li className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-gray-600">
-                    Descuentos aplicados
-                    <IconInfo className="w-3.5 h-3.5 text-gray-400" />
-                  </span>
-                  <span className="font-medium text-red-600 tabular-nums">
-                    {b.discountsApplied > 0 ? "−" : ""}
-                    {formatMoney(b.discountsApplied)}
+                  <span className="text-gray-600">Tarifas de envío</span>
+                  <span className="font-medium text-sky-700 tabular-nums">
+                    {formatMoney(b.deliveryFees)}
                   </span>
                 </li>
                 <li className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-gray-600">
-                    Comisiones de plataforma ({b.commissionRatePercent}%)
+                    Comisión de la app ({b.commissionRatePercent}%)
                     <IconInfo className="w-3.5 h-3.5 text-gray-400" />
                   </span>
-                  <span className="font-medium text-red-600 tabular-nums">
-                    −{formatMoney(b.platformCommissions)}
+                  <span className="font-medium text-violet-700 tabular-nums">
+                    {formatMoney(b.platformCommissions)}
                   </span>
                 </li>
-                {b.deliveryFees > 0 ? (
+                {b.discountsApplied > 0 ? (
                   <li className="flex items-center justify-between gap-2">
-                    <span className="text-gray-600">Tarifas de envío (pedidos)</span>
-                    <span className="font-medium text-emerald-600 tabular-nums">
-                      {formatMoney(b.deliveryFees)}
+                    <span className="text-gray-600">Descuentos aplicados</span>
+                    <span className="font-medium text-red-600 tabular-nums">
+                      −{formatMoney(b.discountsApplied)}
                     </span>
                   </li>
                 ) : null}
+                <li className="flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                  <span className="text-gray-700 font-medium">Total cobrado (c/ envío)</span>
+                  <span className="font-semibold tabular-nums text-gray-900">
+                    {formatMoney(b.ordersSubtotal + b.deliveryFees + b.platformCommissions)}
+                  </span>
+                </li>
               </ul>
               <div className="mt-5 rounded-xl bg-dobby-50 border border-dobby-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-dobby-900">Ingreso total</span>
+                <span className="text-sm font-semibold text-dobby-900">Ingreso app (comisiones)</span>
                 <span className="text-lg font-bold text-dobby-700 tabular-nums">
                   {formatMoney(b.netIncome)}
                 </span>
