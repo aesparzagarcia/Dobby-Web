@@ -6,6 +6,7 @@ export const PRODUCT_CATEGORIES = [
   { value: "comidas", label: "Comidas" },
   { value: "snacks", label: "Snacks" },
   { value: "miscelaneos", label: "Misceláneos" },
+  { value: "autolavado", label: "Autolavado" },
 ] as const;
 
 export type ProductCategoryValue = (typeof PRODUCT_CATEGORIES)[number]["value"];

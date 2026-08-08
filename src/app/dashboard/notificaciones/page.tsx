@@ -13,7 +13,7 @@ const POLL_MS = 12_000;
 type NotificationRow = {
   id: string;
   kind: "RESTAURANT" | "SHOP" | "COURIER";
-  shopType: "RESTAURANT" | "SHOP" | "SERVICE_PROVIDER" | null;
+  shopType: "RESTAURANT" | "SHOP" | "SERVICE_PROVIDER" | "CAR_WASH" | null;
   name: string;
   address: string | null;
   phone: string | null;
@@ -39,6 +39,7 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   RESTAURANT: "Restaurante",
   SHOP: "Tienda",
   SERVICE_PROVIDER: "Proveedor de servicios",
+  CAR_WASH: "Autolavado",
 };
 
 const STATUS_LABELS: Record<NotificationRow["status"], string> = {
