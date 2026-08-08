@@ -53,35 +53,6 @@ const TYPE_LABELS: Record<string, string> = {
   CAR_WASH: "Autolavado",
 };
 
-const DEFAULT_CAR_WASH_SERVICE_NAMES = [
-  "Lavado Express",
-  "Lavado Premium",
-  "Encerado",
-  "Lavado de motor",
-  "Pulido",
-  "Sanitizado",
-] as const;
-
-type CarWashServiceRow = {
-  key: string;
-  id?: string;
-  name: string;
-  price: string;
-};
-
-function newCarWashRow(name = "", price = "", id?: string): CarWashServiceRow {
-  return {
-    key: id ?? `new-${Math.random().toString(36).slice(2, 10)}`,
-    id,
-    name,
-    price,
-  };
-}
-
-function defaultCarWashServices(): CarWashServiceRow[] {
-  return DEFAULT_CAR_WASH_SERVICE_NAMES.map((name) => newCarWashRow(name, ""));
-}
-
 function shopHours(shop: Shop): { open: string; close: string } | null {
   const open = shop.openingHour ?? shop.opening_hour ?? null;
   const close = shop.closingHour ?? shop.closing_hour ?? null;
@@ -366,9 +337,7 @@ export default function ShopsPage() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const [carWashServices, setCarWashServices] = useState<CarWashServiceRow[]>(defaultCarWashServices);
   const [saving, setSaving] = useState(false);
-  const initialCarWashIdsRef = useRef<string[]>([]);
 
   const emptyForm = () => ({
     name: "",
@@ -446,71 +415,6 @@ export default function ShopsPage() {
   const rangeStart = filteredShops.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(safePage * PAGE_SIZE, filteredShops.length);
 
-  async function syncCarWashServices(shopId: string) {
-    const rows = carWashServices
-      .map((row) => ({
-        ...row,
-        name: row.name.trim(),
-        priceNum: Number(String(row.price).replace(/,/g, "").trim()),
-      }))
-      .filter((row) => row.name.length > 0);
-
-    for (const row of rows) {
-      if (!Number.isFinite(row.priceNum) || row.priceNum < 0) {
-        throw new Error(`Precio inválido para «${row.name}»`);
-      }
-    }
-
-    const keepIds = new Set(rows.map((r) => r.id).filter(Boolean) as string[]);
-    for (const oldId of initialCarWashIdsRef.current) {
-      if (!keepIds.has(oldId)) {
-        const del = await fetch(apiPath(`/api/products/${oldId}`), {
-          method: "DELETE",
-          headers: authHeaders(),
-        });
-        if (!del.ok) {
-          const err = await del.json().catch(() => ({}));
-          throw new Error(err.error || "No se pudo eliminar un servicio");
-        }
-      }
-    }
-
-    for (const row of rows) {
-      if (row.id) {
-        const res = await fetch(apiPath(`/api/products/${row.id}`), {
-          method: "PUT",
-          headers: authHeaders(),
-          body: JSON.stringify({
-            name: row.name,
-            price: row.priceNum,
-            category: "autolavado",
-            isActive: true,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `No se pudo actualizar «${row.name}»`);
-        }
-      } else {
-        const res = await fetch(apiPath("/api/products"), {
-          method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({
-            shopId,
-            name: row.name,
-            price: row.priceNum,
-            category: "autolavado",
-            isActive: true,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `No se pudo crear «${row.name}»`);
-        }
-      }
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!hasValidShopLocation(form.lat, form.lng) || !locationFromMap) {
@@ -528,19 +432,9 @@ export default function ShopsPage() {
       setMapPickerOpen(true);
       return;
     }
-    if (form.type === "CAR_WASH") {
-      const priced = carWashServices.filter((r) => r.name.trim());
-      if (priced.length === 0) {
-        alert("Agrega al menos un servicio de autolavado con nombre y precio.");
-        return;
-      }
-      for (const row of priced) {
-        const priceNum = Number(String(row.price).replace(/,/g, "").trim());
-        if (!Number.isFinite(priceNum) || priceNum < 0 || String(row.price).trim() === "") {
-          alert(`Indica el precio de «${row.name.trim()}».`);
-          return;
-        }
-      }
+    if (!form.openingHour.trim() || !form.closingHour.trim()) {
+      alert("Indica hora de apertura y hora de cierre.");
+      return;
     }
     setLocationError(null);
     setSaving(true);
@@ -569,18 +463,12 @@ export default function ShopsPage() {
         alert(typeof data?.error === "string" ? data.error : "No se pudo guardar la tienda");
         return;
       }
-      const shopId = editId ?? (typeof data?.id === "string" ? data.id : null);
-      if (form.type === "CAR_WASH" && shopId) {
-        await syncCarWashServices(shopId);
-      }
       setModal("closed");
       setMapPickerOpen(false);
       setLocationFromMap(false);
       setLocationError(null);
       setEditId(null);
       setForm(emptyForm());
-      setCarWashServices(defaultCarWashServices());
-      initialCarWashIdsRef.current = [];
       load();
     } catch (err) {
       alert(err instanceof Error ? err.message : "No se pudo guardar");
@@ -593,14 +481,12 @@ export default function ShopsPage() {
     setModal("create");
     setEditId(null);
     setForm(emptyForm());
-    setCarWashServices(defaultCarWashServices());
-    initialCarWashIdsRef.current = [];
     setLocationFromMap(false);
     setLocationError(null);
     setMapPickerOpen(true);
   }
 
-  async function openEdit(shop: Shop) {
+  function openEdit(shop: Shop) {
     const hours = shopHours(shop);
     const lat =
       shop.lat != null && Number.isFinite(Number(shop.lat)) ? Number(shop.lat) : null;
@@ -624,32 +510,6 @@ export default function ShopsPage() {
     setLocationError(pinned ? null : "Esta tienda no tiene ubicación en el mapa. Selecciónala antes de guardar.");
     setMapPickerOpen(!pinned);
     setModal("edit");
-
-    if (shop.type === "CAR_WASH") {
-      try {
-        const res = await fetch(apiPath(`/api/products?shopId=${encodeURIComponent(shop.id)}`), {
-          headers: authHeaders(),
-        });
-        const products = await res.json().catch(() => []);
-        const list = Array.isArray(products) ? products : [];
-        if (list.length > 0) {
-          const rows = list.map((p: { id: string; name: string; price: number | string }) =>
-            newCarWashRow(p.name, String(p.price ?? ""), p.id)
-          );
-          setCarWashServices(rows);
-          initialCarWashIdsRef.current = rows.map((r) => r.id!).filter(Boolean);
-        } else {
-          setCarWashServices(defaultCarWashServices());
-          initialCarWashIdsRef.current = [];
-        }
-      } catch {
-        setCarWashServices(defaultCarWashServices());
-        initialCarWashIdsRef.current = [];
-      }
-    } else {
-      setCarWashServices(defaultCarWashServices());
-      initialCarWashIdsRef.current = [];
-    }
   }
 
   async function handleDelete(id: string) {
@@ -872,11 +732,7 @@ export default function ShopsPage() {
 
       {modal !== "closed" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30">
-          <div
-            className={`bg-white rounded-xl shadow-xl w-full p-6 max-h-[90vh] overflow-y-auto ${
-              form.type === "CAR_WASH" ? "max-w-lg" : "max-w-md"
-            }`}
-          >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
               {modal === "create" ? "Nueva tienda" : "Editar tienda"}
             </h2>
@@ -894,13 +750,7 @@ export default function ShopsPage() {
                 <label className="block text-sm text-gray-600 mb-1">Tipo</label>
                 <select
                   value={form.type}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setForm((f) => ({ ...f, type: next }));
-                    if (next === "CAR_WASH" && carWashServices.length === 0) {
-                      setCarWashServices(defaultCarWashServices());
-                    }
-                  }}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="RESTAURANT">Restaurante</option>
@@ -909,74 +759,6 @@ export default function ShopsPage() {
                   <option value="CAR_WASH">Autolavado</option>
                 </select>
               </div>
-              {form.type === "CAR_WASH" ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 space-y-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Servicios</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Nombre y precio de cada servicio (se guardan en la base de datos).
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {carWashServices.map((row) => (
-                      <div key={row.key} className="flex gap-2 items-center">
-                        <input
-                          value={row.name}
-                          onChange={(e) =>
-                            setCarWashServices((rows) =>
-                              rows.map((r) =>
-                                r.key === row.key ? { ...r, name: e.target.value } : r
-                              )
-                            )
-                          }
-                          placeholder="Ej. Lavado Express"
-                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                        />
-                        <div className="relative w-[110px] shrink-0">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            value={row.price}
-                            onChange={(e) =>
-                              setCarWashServices((rows) =>
-                                rows.map((r) =>
-                                  r.key === row.key ? { ...r, price: e.target.value } : r
-                                )
-                              )
-                            }
-                            placeholder="0"
-                            className="w-full border border-gray-200 rounded-lg pl-6 pr-2 py-2 text-sm bg-white tabular-nums"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCarWashServices((rows) => rows.filter((r) => r.key !== row.key))
-                          }
-                          className="text-xs text-red-600 hover:underline px-1 shrink-0"
-                          aria-label="Quitar servicio"
-                        >
-                          Quitar
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCarWashServices((rows) => [...rows, newCarWashRow("", "")])
-                    }
-                    className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
-                  >
-                    + Agregar servicio
-                  </button>
-                </div>
-              ) : null}
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <label className="block text-sm text-gray-600 m-0">
@@ -1026,9 +808,6 @@ export default function ShopsPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Horario de atención</label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Opcional. Deja ambos vacíos si no aplica.
-                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Apertura</label>
@@ -1039,6 +818,7 @@ export default function ShopsPage() {
                         setForm((f) => ({ ...f, openingHour: e.target.value }))
                       }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      required
                     />
                   </div>
                   <div>
@@ -1050,6 +830,7 @@ export default function ShopsPage() {
                         setForm((f) => ({ ...f, closingHour: e.target.value }))
                       }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      required
                     />
                   </div>
                 </div>
