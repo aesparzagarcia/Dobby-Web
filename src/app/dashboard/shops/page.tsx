@@ -895,8 +895,6 @@ export default function ShopsPage() {
                     setMapPickerOpen(false);
                     setLocationFromMap(false);
                     setLocationError(null);
-                    setCarWashServices(defaultCarWashServices());
-                    initialCarWashIdsRef.current = [];
                   }}
                   className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
                 >
