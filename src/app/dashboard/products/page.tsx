@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
 import {
+  CAR_WASH_PRODUCT_CATEGORY,
   DEFAULT_PRODUCT_CATEGORY,
   PRODUCT_CATEGORIES,
   type ProductCategoryValue,
@@ -22,12 +23,12 @@ type Product = {
   isActive: boolean;
   category?: string;
   createdAt?: string;
-  shop: { name: string };
+  shop: { name: string; type?: string };
 };
 
-type Shop = { id: string; name: string };
+type Shop = { id: string; name: string; type?: string };
 
-type CategoryFilter = "all" | "bebidas" | "alcohol" | "comidas" | "postres";
+type CategoryFilter = "all" | "bebidas" | "alcohol" | "comidas" | "postres" | "autolavado";
 type SortKey = "recent" | "name" | "price_asc" | "price_desc";
 type ViewMode = "grid" | "list";
 
@@ -37,7 +38,16 @@ const CATEGORY_TABS: { id: CategoryFilter; label: string; icon: string }[] = [
   { id: "alcohol", label: "Alcohol", icon: "🍾" },
   { id: "comidas", label: "Comidas", icon: "🍽" },
   { id: "postres", label: "Postres", icon: "🍰" },
+  { id: "autolavado", label: "Autolavado", icon: "🚗" },
 ];
+
+function isCarWashShop(shop: { type?: string } | null | undefined) {
+  return shop?.type === "CAR_WASH";
+}
+
+function categoryForShop(shop: Shop | undefined): ProductCategoryValue {
+  return isCarWashShop(shop) ? CAR_WASH_PRODUCT_CATEGORY : DEFAULT_PRODUCT_CATEGORY;
+}
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -268,9 +278,14 @@ export default function ProductsPage() {
     category: DEFAULT_PRODUCT_CATEGORY,
   });
   const [editId, setEditId] = useState<string | null>(null);
+  const [editShopType, setEditShopType] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const productImageInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedShop = shops.find((s) => s.id === form.shopId);
+  const formShopIsCarWash =
+    modal === "edit" ? editShopType === "CAR_WASH" : isCarWashShop(selectedShop);
 
   function load() {
     Promise.all([
@@ -337,6 +352,9 @@ export default function ProductsPage() {
     }
     const url = editId ? `/api/products/${editId}` : "/api/products";
     const method = editId ? "PUT" : "POST";
+    const resolvedCategory = formShopIsCarWash
+      ? CAR_WASH_PRODUCT_CATEGORY
+      : form.category;
     const body = editId
       ? {
           name: form.name,
@@ -346,7 +364,7 @@ export default function ProductsPage() {
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
           isActive: form.isActive,
-          category: form.category,
+          category: resolvedCategory,
         }
       : {
           shopId: form.shopId,
@@ -357,7 +375,7 @@ export default function ProductsPage() {
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
           isActive: form.isActive,
-          category: form.category,
+          category: resolvedCategory,
         };
     const res = await fetch(apiPath(url), {
       method,
@@ -367,6 +385,7 @@ export default function ProductsPage() {
     if (res.ok) {
       setModal("closed");
       setEditId(null);
+      setEditShopType(null);
       setForm({
         shopId: shops[0]?.id || "",
         name: "",
@@ -376,7 +395,7 @@ export default function ProductsPage() {
         hasPromotion: false,
         discount: 0,
         isActive: true,
-        category: DEFAULT_PRODUCT_CATEGORY,
+        category: categoryForShop(shops[0]),
       });
       load();
     } else {
@@ -388,8 +407,10 @@ export default function ProductsPage() {
   function openCreate() {
     setModal("create");
     setEditId(null);
+    setEditShopType(null);
+    const first = shops[0];
     setForm({
-      shopId: shops[0]?.id || "",
+      shopId: first?.id || "",
       name: "",
       description: "",
       price: "",
@@ -397,12 +418,13 @@ export default function ProductsPage() {
       hasPromotion: false,
       discount: 0,
       isActive: true,
-      category: DEFAULT_PRODUCT_CATEGORY,
+      category: categoryForShop(first),
     });
   }
 
   function openEdit(p: Product) {
     setEditId(p.id);
+    setEditShopType(p.shop?.type ?? null);
     setForm({
       shopId: "",
       name: p.name,
@@ -412,9 +434,11 @@ export default function ProductsPage() {
       hasPromotion: !!p.hasPromotion,
       discount: Number.isFinite(Number(p.discount)) ? Number(p.discount) : 0,
       isActive: p.isActive,
-      category: (PRODUCT_CATEGORIES.some((c) => c.value === p.category)
-        ? p.category
-        : DEFAULT_PRODUCT_CATEGORY) as ProductCategoryValue,
+      category: isCarWashShop(p.shop)
+        ? CAR_WASH_PRODUCT_CATEGORY
+        : ((PRODUCT_CATEGORIES.some((c) => c.value === p.category)
+            ? p.category
+            : DEFAULT_PRODUCT_CATEGORY) as ProductCategoryValue),
     });
     setModal("edit");
   }
@@ -665,7 +689,15 @@ export default function ProductsPage() {
                   <label className="block text-sm text-gray-600">Tienda</label>
                   <select
                     value={form.shopId}
-                    onChange={(e) => setForm((f) => ({ ...f, shopId: e.target.value }))}
+                    onChange={(e) => {
+                      const shopId = e.target.value;
+                      const shop = shops.find((s) => s.id === shopId);
+                      setForm((f) => ({
+                        ...f,
+                        shopId,
+                        category: categoryForShop(shop),
+                      }));
+                    }}
                     className="w-full border rounded-lg px-3 py-2"
                     required
                   >
@@ -706,23 +738,25 @@ export default function ProductsPage() {
                   rows={2}
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-600">Categoría</label>
-                <select
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, category: e.target.value as ProductCategoryValue }))
-                  }
-                  className="w-full border rounded-lg px-3 py-2"
-                  required
-                >
-                  {PRODUCT_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!formShopIsCarWash ? (
+                <div>
+                  <label className="block text-sm text-gray-600">Categoría</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, category: e.target.value as ProductCategoryValue }))
+                    }
+                    className="w-full border rounded-lg px-3 py-2"
+                    required
+                  >
+                    {PRODUCT_CATEGORIES.filter((c) => c.value !== "autolavado").map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"

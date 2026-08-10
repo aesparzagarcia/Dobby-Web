@@ -6,11 +6,13 @@ export const PRODUCT_CATEGORIES = [
   { value: "comidas", label: "Comidas" },
   { value: "snacks", label: "Snacks" },
   { value: "miscelaneos", label: "Misceláneos" },
+  { value: "autolavado", label: "Autolavado" },
 ] as const;
 
 export type ProductCategoryValue = (typeof PRODUCT_CATEGORIES)[number]["value"];
 
 export const DEFAULT_PRODUCT_CATEGORY: ProductCategoryValue = "miscelaneos";
+export const CAR_WASH_PRODUCT_CATEGORY: ProductCategoryValue = "autolavado";
 
 export function productCategoryLabel(value: string | null | undefined): string {
   const found = PRODUCT_CATEGORIES.find((c) => c.value === value);
