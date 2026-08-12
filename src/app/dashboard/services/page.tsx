@@ -1,7 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
+import {
+  hasValidServiceAreaPolygon,
+  isInsideServiceArea,
+  loadServiceAreaRing,
+  OUTSIDE_SERVICE_AREA_ERROR,
+} from "@/lib/serviceArea";
+
+const ShopLocationPickerMap = dynamic(
+  () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] bg-gray-100 animate-pulse rounded-lg border border-gray-200" />
+    ),
+  }
+);
 
 const PAGE_SIZE = 16;
 
@@ -28,6 +46,9 @@ type Service = {
   name: string;
   description: string | null;
   category: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   logoUrl: string | null;
   isActive: boolean;
   openingHour?: string | null;
@@ -41,6 +62,10 @@ type Service = {
   commissionRatePercent?: number;
 };
 
+function hasValidServiceLocation(lat: number | null, lng: number | null): boolean {
+  return lat != null && lng != null && isUsableWgs84Point(lat, lng);
+}
+
 function serviceHours(s: Service): { open: string; close: string } | null {
   const open = s.openingHour ?? s.opening_hour ?? null;
   const close = s.closingHour ?? s.closing_hour ?? null;
@@ -52,6 +77,9 @@ const emptyForm = () => ({
   name: "",
   description: "",
   category: "OTHER",
+  address: "",
+  lat: null as number | null,
+  lng: null as number | null,
   logoUrl: "",
   isActive: true,
   openingHour: "",
@@ -210,6 +238,11 @@ function ServiceCard({
         ) : (
           <p className="text-[11px] text-gray-400 mt-1.5 italic">Sin descripción</p>
         )}
+        {service.address ? (
+          <p className="text-[10px] text-gray-400 mt-1 line-clamp-1" title={service.address}>
+            {service.address}
+          </p>
+        ) : null}
         {hours ? (
           <p className="text-[10px] text-gray-400 mt-1 tabular-nums">
             {hours.open} – {hours.close}
@@ -277,7 +310,11 @@ export default function ServicesPage() {
   const [modal, setModal] = useState<"closed" | "create" | "edit">("closed");
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [locationFromMap, setLocationFromMap] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -298,6 +335,10 @@ export default function ServicesPage() {
   }, [load]);
 
   useEffect(() => {
+    void loadServiceAreaRing();
+  }, []);
+
+  useEffect(() => {
     setPage(1);
   }, [searchQuery, statusFilter, sortBy]);
 
@@ -309,6 +350,7 @@ export default function ServicesPage() {
         (s) =>
           s.name.toLowerCase().includes(q) ||
           (s.description ?? "").toLowerCase().includes(q) ||
+          (s.address ?? "").toLowerCase().includes(q) ||
           (categoryLabels[s.category] ?? "").toLowerCase().includes(q)
       );
     }
@@ -346,30 +388,56 @@ export default function ServicesPage() {
       alert("Indica hora de apertura y hora de cierre.");
       return;
     }
+    if (!hasValidServiceLocation(form.lat, form.lng) || !locationFromMap) {
+      setLocationError(shopLocationError());
+      setMapPickerOpen(true);
+      return;
+    }
+    if (
+      hasValidServiceAreaPolygon() &&
+      form.lat != null &&
+      form.lng != null &&
+      !isInsideServiceArea(form.lat, form.lng)
+    ) {
+      setLocationError(OUTSIDE_SERVICE_AREA_ERROR);
+      setMapPickerOpen(true);
+      return;
+    }
+    setSaving(true);
     const url = editId ? `/api/services/${editId}` : "/api/services";
     const method = editId ? "PUT" : "POST";
     const body = {
       name: form.name,
       description: form.description || null,
       category: form.category,
+      address: form.address.trim(),
+      lat: form.lat,
+      lng: form.lng,
       logoUrl: form.logoUrl || null,
       isActive: form.isActive,
       opening_hour: form.openingHour.trim(),
       closing_hour: form.closingHour.trim(),
     };
-    const res = await fetch(apiPath(url), {
-      method,
-      headers: authHeaders(),
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      setModal("closed");
-      setEditId(null);
-      setForm(emptyForm());
-      load();
-    } else {
-      alert(typeof data?.error === "string" ? data.error : "No se pudo guardar el servicio");
+    try {
+      const res = await fetch(apiPath(url), {
+        method,
+        headers: authHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setModal("closed");
+        setEditId(null);
+        setForm(emptyForm());
+        setLocationFromMap(false);
+        setLocationError(null);
+        setMapPickerOpen(false);
+        load();
+      } else {
+        alert(typeof data?.error === "string" ? data.error : "No se pudo guardar el servicio");
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -377,20 +445,31 @@ export default function ServicesPage() {
     setModal("create");
     setEditId(null);
     setForm(emptyForm());
+    setLocationFromMap(false);
+    setLocationError(null);
+    setMapPickerOpen(true);
   }
 
   function openEdit(s: Service) {
     const hours = serviceHours(s);
+    const lat = s.lat ?? null;
+    const lng = s.lng ?? null;
+    const pinned = hasValidServiceLocation(lat, lng);
     setEditId(s.id);
     setForm({
       name: s.name,
       description: s.description || "",
       category: s.category,
+      address: s.address || "",
+      lat,
+      lng,
       logoUrl: s.logoUrl || "",
       isActive: s.isActive,
       openingHour: hours?.open ?? "",
       closingHour: hours?.close ?? "",
     });
+    setLocationFromMap(pinned);
+    setLocationError(null);
     setModal("edit");
   }
 
@@ -688,6 +767,46 @@ export default function ServicesPage() {
                 />
               </div>
               <div>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-sm text-gray-600 m-0">
+                    Dirección <span className="text-red-600">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setMapPickerOpen(true)}
+                    className="text-sm font-medium text-dobby-600 hover:text-dobby-800"
+                  >
+                    {locationFromMap ? "Cambiar en mapa" : "Seleccionar en mapa"}
+                  </button>
+                </div>
+                {!locationFromMap ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 mb-2">
+                    Obligatorio: abre el mapa, coloca el pin sobre el domicilio y pulsa «Aplicar
+                    ubicación».
+                  </p>
+                ) : null}
+                {locationError ? (
+                  <p className="text-xs text-red-600 mb-2">{locationError}</p>
+                ) : locationFromMap && form.lat != null && form.lng != null ? (
+                  <p className="text-xs text-emerald-700 mb-2">
+                    Ubicación confirmada ({form.lat.toFixed(5)}, {form.lng.toFixed(5)})
+                  </p>
+                ) : null}
+                <input
+                  value={form.address}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setForm((f) => ({ ...f, address: next, lat: null, lng: null }));
+                    setLocationFromMap(false);
+                    setLocationError(null);
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  required
+                  readOnly={locationFromMap}
+                  placeholder="Se completa al aplicar ubicación en el mapa"
+                />
+              </div>
+              <div>
                 <label className="block text-sm text-gray-600 mb-1">
                   Horario de atención <span className="text-red-600">*</span>
                 </label>
@@ -733,14 +852,23 @@ export default function ServicesPage() {
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700"
+                  disabled={
+                    saving || !locationFromMap || !hasValidServiceLocation(form.lat, form.lng)
+                  }
+                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {modal === "create" ? "Crear" : "Guardar"}
+                  {saving ? "Guardando…" : modal === "create" ? "Crear" : "Guardar"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModal("closed")}
-                  className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  disabled={saving}
+                  onClick={() => {
+                    setModal("closed");
+                    setMapPickerOpen(false);
+                    setLocationFromMap(false);
+                    setLocationError(null);
+                  }}
+                  className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -761,6 +889,26 @@ export default function ServicesPage() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {mapPickerOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-2">Ubicación en el mapa</h3>
+            <ShopLocationPickerMap
+              initialLat={form.lat}
+              initialLng={form.lng}
+              initialAddress={form.address}
+              onClose={() => setMapPickerOpen(false)}
+              onApply={(lat, lng, address) => {
+                setForm((f) => ({ ...f, lat, lng, address }));
+                setLocationFromMap(true);
+                setLocationError(null);
+                setMapPickerOpen(false);
+              }}
+            />
           </div>
         </div>
       )}
