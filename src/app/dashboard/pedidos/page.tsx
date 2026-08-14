@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { authHeaders, apiPath } from "@/lib/api";
 import { ADMIN_ORDERS_CHANGED_EVENT } from "@/contexts/DashboardOrderAlertsContext";
 
@@ -219,6 +220,9 @@ export default function PedidosPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; openUp: boolean } | null>(
+    null
+  );
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<AdminOrderTracking | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
@@ -357,9 +361,22 @@ export default function PedidosPage() {
 
   useEffect(() => {
     if (!openMenuId) return;
-    const close = () => setOpenMenuId(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
+    const close = () => {
+      setOpenMenuId(null);
+      setMenuPos(null);
+    };
+    // Defer so the same click that opened the menu does not close it immediately.
+    const timer = window.setTimeout(() => {
+      window.addEventListener("click", close);
+      window.addEventListener("scroll", close, true);
+      window.addEventListener("resize", close);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
   }, [openMenuId]);
 
   function exportCsv() {
@@ -464,6 +481,8 @@ export default function PedidosPage() {
           year: "numeric",
         })}`
       : "Rango de fechas";
+
+  const menuOrder = openMenuId ? orders.find((o) => o.id === openMenuId) ?? null : null;
 
   return (
     <div className="p-6 lg:p-8 max-w-[1600px]">
@@ -717,47 +736,36 @@ export default function PedidosPage() {
                       >
                         {productsSummary(order.items)}
                       </td>
-                      <td className="px-4 py-3.5 text-right relative">
+                      <td className="px-4 py-3.5 text-right">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenMenuId((id) => (id === order.id ? null : order.id));
+                            if (openMenuId === order.id) {
+                              setOpenMenuId(null);
+                              setMenuPos(null);
+                              return;
+                            }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const menuWidth = 176;
+                            const left = Math.min(
+                              Math.max(8, rect.right - menuWidth),
+                              window.innerWidth - menuWidth - 8
+                            );
+                            const openUp = rect.bottom + 120 > window.innerHeight;
+                            setMenuPos({
+                              top: openUp ? rect.top - 8 : rect.bottom + 4,
+                              left,
+                              openUp,
+                            });
+                            setOpenMenuId(order.id);
                           }}
                           className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                           aria-label="Acciones"
+                          aria-expanded={openMenuId === order.id}
                         >
                           <IconDots className="w-5 h-5" />
                         </button>
-                        {openMenuId === order.id ? (
-                          <div
-                            className="absolute right-4 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg text-left"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {trackable ? (
-                              <button
-                                type="button"
-                                className="w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  setTrackingOrderId(order.id);
-                                }}
-                              >
-                                Ver mapa en vivo
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                              onClick={() => {
-                                void navigator.clipboard?.writeText(order.id);
-                                setOpenMenuId(null);
-                              }}
-                            >
-                              Copiar ID
-                            </button>
-                          </div>
-                        ) : null}
                       </td>
                     </tr>
                   );
@@ -940,6 +948,49 @@ export default function PedidosPage() {
           </div>
         </div>
       ) : null}
+
+      {typeof document !== "undefined" && openMenuId && menuPos && menuOrder
+        ? createPortal(
+            <div
+              className="fixed z-[60] w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg text-left"
+              style={{
+                top: menuPos.top,
+                left: menuPos.left,
+                transform: menuPos.openUp ? "translateY(-100%)" : undefined,
+              }}
+              onClick={(e) => e.stopPropagation()}
+              role="menu"
+            >
+              {canOpenTrackingModal(menuOrder.status) ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    setMenuPos(null);
+                    setTrackingOrderId(menuOrder.id);
+                  }}
+                >
+                  Ver mapa en vivo
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(menuOrder.id);
+                  setOpenMenuId(null);
+                  setMenuPos(null);
+                }}
+              >
+                Copiar ID
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
