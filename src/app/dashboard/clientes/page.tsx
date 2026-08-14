@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { authHeaders, apiPath } from "@/lib/api";
 
@@ -69,7 +70,11 @@ export default function ClientesPage() {
     let items = [...list];
     const q = search.trim().toLowerCase();
     if (q) {
-      items = items.filter((c) => displayName(c).toLowerCase().includes(q));
+      items = items.filter((c) => {
+        const name = displayName(c).toLowerCase();
+        const id = c.id.toLowerCase();
+        return name.includes(q) || id.includes(q) || id.startsWith(q);
+      });
     }
     items.sort((a, b) => {
       if (sortBy === "name") return displayName(a).localeCompare(displayName(b), "es");
@@ -92,8 +97,8 @@ export default function ClientesPage() {
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
         <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-          Usuarios registrados en la app. Se muestra información general y de actividad, sin datos sensibles
-          como correo, teléfono ni direcciones.
+          Usuarios registrados en la app. Busca por nombre o ID y entra al detalle para ver contacto,
+          direcciones y pedidos.
         </p>
       </div>
 
@@ -113,7 +118,7 @@ export default function ClientesPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre..."
+            placeholder="Buscar por nombre o ID..."
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dobby-500/30 focus:border-dobby-400"
           />
         </div>
@@ -179,10 +184,20 @@ export default function ClientesPage() {
                 {pageItems.map((client) => (
                   <tr key={client.id} className="hover:bg-dobby-50/30 transition-colors">
                     <td className="px-4 py-3.5">
-                      <p className="text-sm font-medium text-gray-900">{displayName(client)}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono truncate max-w-[140px]" title={client.id}>
-                        {client.id.slice(0, 8)}…
-                      </p>
+                      <Link
+                        href={`/dashboard/clientes/${client.id}`}
+                        className="group block min-w-0"
+                      >
+                        <p className="text-sm font-medium text-gray-900 group-hover:text-dobby-700">
+                          {displayName(client)}
+                        </p>
+                        <p
+                          className="text-xs text-gray-400 mt-0.5 font-mono truncate max-w-[160px]"
+                          title={client.id}
+                        >
+                          {client.id}
+                        </p>
+                      </Link>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-nowrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-dobby-50 text-dobby-700 text-xs font-medium">
@@ -192,7 +207,9 @@ export default function ClientesPage() {
                     <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-nowrap">{client.dobbyXp}</td>
                     <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-nowrap">
                       {client.orderStreakDays > 0 ? (
-                        <span>{client.orderStreakDays} día{client.orderStreakDays !== 1 ? "s" : ""}</span>
+                        <span>
+                          {client.orderStreakDays} día{client.orderStreakDays !== 1 ? "s" : ""}
+                        </span>
                       ) : (
                         "—"
                       )}
