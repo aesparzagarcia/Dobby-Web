@@ -14,6 +14,13 @@ export function apiPath(path: string): string {
   return base + (path.startsWith("/") ? path : "/" + path);
 }
 
+/** Use for img src when the URL is from the backend (e.g. /uploads/shops/...). */
+export function uploadsUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return apiPath(url);
+}
+
 const CSRF_COOKIE = "ewe_csrf";
 
 /** Read the non-HttpOnly CSRF cookie for double-submit (`X-CSRF-Token`). */
