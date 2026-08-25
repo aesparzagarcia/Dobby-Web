@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import {
   CAR_WASH_PRODUCT_CATEGORY,
   DEFAULT_PRODUCT_CATEGORY,
@@ -289,8 +289,8 @@ export default function ProductsPage() {
 
   function load() {
     Promise.all([
-      fetch(apiPath("/api/products"), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath("/api/shops"), { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/products", { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/shops", { headers: authHeaders() }).then((r) => r.json()),
     ])
       .then(([prods, shopList]) => {
         setProducts(Array.isArray(prods) ? prods : []);
@@ -377,7 +377,7 @@ export default function ProductsPage() {
           isActive: form.isActive,
           category: resolvedCategory,
         };
-    const res = await fetch(apiPath(url), {
+    const res = await apiFetch(url, {
       method,
       headers: authHeaders(),
       body: JSON.stringify(body),
@@ -446,11 +446,6 @@ export default function ProductsPage() {
   async function handleProductImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
-    const token = getToken();
-    if (!token) {
-      alert("Sesión expirada. Vuelve a iniciar sesión.");
-      return;
-    }
     const currentCount = form.imageUrls.length;
     const slotsLeft = MAX_PHOTOS - currentCount;
     if (slotsLeft <= 0) {
@@ -472,10 +467,9 @@ export default function ProductsPage() {
       for (const file of toUpload) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("token", token);
-        const res = await fetch(apiPath("/api/upload/product-image"), {
+        const res = await apiFetch("/api/upload/product-image", {
           method: "POST",
-          headers: { ...authHeadersForUpload(), "X-Auth-Token": token },
+          headers: { ...authHeadersForUpload() },
           body: formData,
         });
         const data = await res.json();
@@ -503,7 +497,7 @@ export default function ProductsPage() {
   async function handleToggleActive(product: Product, active: boolean) {
     setTogglingId(product.id);
     try {
-      const res = await fetch(apiPath(`/api/products/${product.id}`), {
+      const res = await apiFetch(`/api/products/${product.id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify({ isActive: active }),

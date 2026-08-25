@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { apiPath, authHeaders } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 import {
   ADMIN_PRE_REGISTRATIONS_CHANGED_EVENT,
   useDashboardPreRegistrationAlerts,
@@ -73,7 +73,7 @@ export default function NotificacionesPage() {
     if (!options?.silent) setLoading(true);
     try {
       const q = filter === "unread" ? "?unreadOnly=true" : "";
-      const res = await fetch(apiPath(`/api/admin/notifications${q}`), {
+      const res = await apiFetch(`/api/admin/notifications${q}`, {
         headers: authHeaders(),
       });
       const data = await res.json();
@@ -118,7 +118,7 @@ export default function NotificacionesPage() {
     setBusyId(id);
     setActionError(null);
     try {
-      await fetch(apiPath(`/api/admin/notifications/${id}/read`), {
+      await apiFetch(`/api/admin/notifications/${id}/read`, {
         method: "PATCH",
         headers: authHeaders(),
       });
@@ -133,7 +133,7 @@ export default function NotificacionesPage() {
     setBusyId(id);
     setActionError(null);
     try {
-      const res = await fetch(apiPath(`/api/admin/notifications/${id}/status`), {
+      const res = await apiFetch(`/api/admin/notifications/${id}/status`, {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ status }),
@@ -154,7 +154,7 @@ export default function NotificacionesPage() {
     setBusyId(id);
     setActionError(null);
     try {
-      const res = await fetch(apiPath(`/api/admin/notifications/${id}/accept`), {
+      const res = await apiFetch(`/api/admin/notifications/${id}/accept`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -174,7 +174,7 @@ export default function NotificacionesPage() {
     setBusyId(id);
     setActionError(null);
     try {
-      const res = await fetch(apiPath(`/api/admin/notifications/${id}/accept-courier`), {
+      const res = await apiFetch(`/api/admin/notifications/${id}/accept-courier`, {
         method: "POST",
         headers: authHeaders(),
       });

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 import { ADMIN_ORDERS_CHANGED_EVENT } from "@/contexts/DashboardOrderAlertsContext";
 
 const OrderTrackingMap = dynamic(
@@ -231,7 +231,7 @@ export default function PedidosPage() {
   const load = useCallback(() => {
     setLoading(true);
     const q = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
-    fetch(apiPath(`/api/admin/orders${q}`), { headers: authHeaders() })
+    apiFetch(`/api/admin/orders${q}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .catch(() => setOrders([]))
@@ -243,7 +243,7 @@ export default function PedidosPage() {
   }, [load]);
 
   useEffect(() => {
-    fetch(apiPath("/api/shops"), { headers: authHeaders() })
+    apiFetch("/api/shops", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
@@ -303,7 +303,7 @@ export default function PedidosPage() {
   }, [page, safePage]);
 
   const fetchTracking = useCallback(async (orderId: string) => {
-    const r = await fetch(apiPath(`/api/admin/orders/${orderId}/tracking`), {
+    const r = await apiFetch(`/api/admin/orders/${orderId}/tracking`, {
       headers: authHeaders(),
     });
     const data = await r.json().catch(() => null);

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
 import {
   hasValidServiceAreaPolygon,
@@ -355,7 +355,7 @@ export default function ShopsPage() {
   function load() {
     setLoading(true);
     const q = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
-    fetch(apiPath(`/api/shops${q}`), { headers: authHeaders() })
+    apiFetch(`/api/shops${q}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setShops(Array.isArray(data) ? data : []))
       .catch(() => setShops([]))
@@ -453,7 +453,7 @@ export default function ShopsPage() {
         opening_hour: form.openingHour.trim() || null,
         closing_hour: form.closingHour.trim() || null,
       };
-      const res = await fetch(apiPath(url), {
+      const res = await apiFetch(url, {
         method,
         headers: authHeaders(),
         body: JSON.stringify(body),
@@ -514,7 +514,7 @@ export default function ShopsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar esta tienda?")) return;
-    const res = await fetch(apiPath(`/api/shops/${id}`), {
+    const res = await apiFetch(`/api/shops/${id}`, {
       method: "DELETE",
       headers: authHeaders(),
     });
@@ -525,7 +525,7 @@ export default function ShopsPage() {
     setTogglingId(shop.id);
     const status = active ? "ACTIVE" : "INACTIVE";
     try {
-      const res = await fetch(apiPath(`/api/shops/${shop.id}`), {
+      const res = await apiFetch(`/api/shops/${shop.id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify({ status }),
@@ -553,19 +553,12 @@ export default function ShopsPage() {
     }
     setLogoUploading(true);
     try {
-      const token = getToken();
-      if (!token) {
-        alert("Sesión expirada. Vuelve a iniciar sesión.");
-        return;
-      }
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("token", token);
-      const res = await fetch(apiPath("/api/upload/shop-logo"), {
+      const res = await apiFetch("/api/upload/shop-logo", {
         method: "POST",
         headers: {
           ...authHeadersForUpload(),
-          "X-Auth-Token": token,
         },
         body: formData,
       });

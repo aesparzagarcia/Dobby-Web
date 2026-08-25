@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
-import { apiPath, authHeaders } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 type PendingPreRegistration = {
   id: string;
@@ -119,7 +119,7 @@ export function DashboardPreRegistrationAlertsProvider({
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     pollingRef.current = true;
     try {
-      const res = await fetch(apiPath("/api/admin/notifications?unreadOnly=true"), {
+      const res = await apiFetch("/api/admin/notifications?unreadOnly=true", {
         headers: authHeaders(),
       });
       if (!res.ok) return;

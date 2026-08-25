@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 import {
   calculateDeliveryFee,
   draftToSettings,
@@ -299,7 +299,7 @@ export default function ConfiguracionPage() {
   function load() {
     setLoading(true);
     setError(null);
-    fetch(apiPath("/api/admin/app-config"), { headers: authHeaders() })
+    apiFetch("/api/admin/app-config", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? (data as AppConfigRow[]) : [];
@@ -375,7 +375,7 @@ export default function ConfiguracionPage() {
             ? draft[r.key] === "true"
             : Number.parseFloat(draft[r.key] ?? "0"),
       }));
-      const res = await fetch(apiPath("/api/admin/app-config"), {
+      const res = await apiFetch("/api/admin/app-config", {
         method: "PUT",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ items }),

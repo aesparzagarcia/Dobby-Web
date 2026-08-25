@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 export default function DashboardOverview() {
   const [income, setIncome] = useState<{ total: number } | null>(null);
@@ -14,11 +14,11 @@ export default function DashboardOverview() {
     const to = new Date();
     const q = `?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`;
     Promise.all([
-      fetch(apiPath(`/api/analytics/income${q}`), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath("/api/shops"), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath("/api/services"), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath("/api/products"), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath("/api/delivery-men"), { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch(`/api/analytics/income${q}`, { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/shops", { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/services", { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/products", { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch("/api/delivery-men", { headers: authHeaders() }).then((r) => r.json()),
     ])
       .then(([incomeData, shops, services, products, deliveryMen]) => {
         setIncome(incomeData && typeof incomeData.total === "number" ? incomeData : null);

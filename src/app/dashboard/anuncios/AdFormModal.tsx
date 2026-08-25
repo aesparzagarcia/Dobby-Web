@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 
 const ShopLocationPickerMap = dynamic(
   () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
@@ -424,7 +424,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
   }, [initialValues]);
 
   useEffect(() => {
-    fetch(apiPath("/api/shops"), { headers: authHeaders() })
+    apiFetch("/api/shops", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
@@ -454,20 +454,14 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
       alert(field === "imageUrl" ? "La imagen no debe superar 5 MB." : "El logo no debe superar 2 MB.");
       return;
     }
-    const token = getToken();
-    if (!token) {
-      alert("Sesión expirada. Vuelve a iniciar sesión.");
-      return;
-    }
     const setUploading = field === "imageUrl" ? setImageUploading : setLogoUploading;
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("token", token);
-      const res = await fetch(apiPath("/api/upload/ad-image"), {
+      const res = await apiFetch("/api/upload/ad-image", {
         method: "POST",
-        headers: { ...authHeadersForUpload(), "X-Auth-Token": token },
+        headers: { ...authHeadersForUpload() },
         body: formData,
       });
       const data = await res.json();
@@ -542,7 +536,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
     };
 
     try {
-      const res = await fetch(apiPath(url), {
+      const res = await apiFetch(url, {
         method,
         headers: authHeaders(),
         body: JSON.stringify(body),

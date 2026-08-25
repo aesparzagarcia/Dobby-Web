@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 type Client = {
   id: string;
@@ -53,7 +53,7 @@ export default function ClientesPage() {
 
   function load() {
     setLoading(true);
-    fetch(apiPath("/api/clients"), { headers: authHeaders() })
+    apiFetch("/api/clients", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setList(Array.isArray(data) ? data : []))
       .catch(() => setList([]))

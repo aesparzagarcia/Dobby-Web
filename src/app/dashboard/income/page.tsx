@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { authHeaders, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
 import {
   Bar,
   BarChart,
@@ -238,7 +238,7 @@ export default function IncomePage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch(apiPath(`/api/analytics/income?from=${from}&to=${to}`), { headers: authHeaders() })
+    apiFetch(`/api/analytics/income?from=${from}&to=${to}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((json) => {
         if (json?.summary && json?.breakdown) setData(json as IncomeData);

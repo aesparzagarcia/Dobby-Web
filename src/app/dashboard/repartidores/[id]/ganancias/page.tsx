@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { authHeaders, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
 
 type DeliveryRow = {
   id: string;
@@ -84,7 +84,7 @@ export default function DriverEarningsPage() {
       if (!id) return;
       setLoading(true);
       setError(null);
-      fetch(apiPath(`/api/delivery-men/${id}/earnings?date=${encodeURIComponent(day)}`), {
+      apiFetch(`/api/delivery-men/${id}/earnings?date=${encodeURIComponent(day)}`, {
         headers: authHeaders(),
       })
         .then(async (r) => {

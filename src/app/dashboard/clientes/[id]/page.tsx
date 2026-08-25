@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 type AddressRow = {
   id: string;
@@ -140,7 +140,7 @@ export default function ClienteDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    fetch(apiPath(`/api/clients/${encodeURIComponent(id)}`), { headers: authHeaders() })
+    apiFetch(`/api/clients/${encodeURIComponent(id)}`, { headers: authHeaders() })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
         if (!r.ok) {

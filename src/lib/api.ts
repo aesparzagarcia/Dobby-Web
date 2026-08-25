@@ -1,51 +1,11 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL || "";
+/**
+ * Browser calls stay same-origin (`/api/...`).
+ * Next.js rewrites proxy to the backend (see next.config.js + NEXT_PUBLIC_API_URL).
+ * That lets the HttpOnly session cookie bind to the admin host (not cross-site).
+ */
+const BASE = "";
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
-
-export function getTokenExpiration(token: string | null): number | null {
-  if (!token || typeof window === "undefined") return null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = parts[1];
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    const data = JSON.parse(json) as { exp?: number };
-    return typeof data.exp === "number" ? data.exp : null;
-  } catch {
-    return null;
-  }
-}
-
-export function isTokenExpired(): boolean {
-  const token = getToken();
-  const exp = getTokenExpiration(token);
-  if (exp == null) return true;
-  return Date.now() / 1000 >= exp;
-}
-
-export function authHeaders(): HeadersInit {
-  const token = getToken();
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-export function authHeadersForUpload(): HeadersInit {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-/** Base URL of the backend API (e.g. http://localhost:3001). Empty when using same-origin. */
+/** Base URL of the backend API. Empty — same-origin via Next rewrites. */
 export const API = BASE;
 
 /** Full URL for an API path. Use for all fetch() calls to the backend. */
@@ -54,9 +14,60 @@ export function apiPath(path: string): string {
   return base + (path.startsWith("/") ? path : "/" + path);
 }
 
-/** Use for img src when the URL is from the backend (e.g. /uploads/shops/...). */
-export function uploadsUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  if (url.startsWith("http")) return url;
-  return apiPath(url);
+const CSRF_COOKIE = "ewe_csrf";
+
+/** Read the non-HttpOnly CSRF cookie for double-submit (`X-CSRF-Token`). */
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const re = new RegExp(`(?:^|;\\s*)${CSRF_COOKIE}=([^;]*)`);
+  const m = document.cookie.match(re);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1].trim()) || null;
+  } catch {
+    return m[1].trim() || null;
+  }
+}
+
+/**
+ * Fetch against the API with session cookie (credentials: include).
+ * Admin auth is HttpOnly `ewe_token` — do not store JWTs in localStorage.
+ * When CSRF protection is on (`COOKIE_SAMESITE=None` or `ADMIN_CSRF=true`),
+ * mutating requests send `X-CSRF-Token` from the `ewe_csrf` cookie.
+ */
+export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+  const headers = new Headers(init.headers);
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    const csrf = readCsrfCookie();
+    if (csrf && !headers.has("X-CSRF-Token")) {
+      headers.set("X-CSRF-Token", csrf);
+    }
+  }
+  return fetch(apiPath(path), {
+    ...init,
+    headers,
+    credentials: "include",
+  });
+}
+
+export function authHeaders(): HeadersInit {
+  return { "Content-Type": "application/json" };
+}
+
+export function authHeadersForUpload(): HeadersInit {
+  return {};
+}
+
+/** Clear legacy client-side session leftovers from pre-HttpOnly auth. */
+export function clearLegacyClientSession(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  } catch {
+    /* ignore */
+  }
+  document.cookie = "ewe_token=; path=/; max-age=0";
+  document.cookie = "ewe_csrf=; path=/; max-age=0";
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiPath } from "@/lib/api";
+import { apiFetch, clearLegacyClientSession } from "@/lib/api";
 import { IconDobbyLogo } from "@/components/dashboard/NavIcons";
 
 export default function LoginPage() {
@@ -17,7 +17,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(apiPath("/api/auth/login"), {
+      clearLegacyClientSession();
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -27,9 +28,6 @@ export default function LoginPage() {
         setError(data.error || "Error al iniciar sesión");
         return;
       }
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      document.cookie = `ewe_token=${encodeURIComponent(data.token)}; path=/; max-age=604800; SameSite=Lax`;
       router.push("/dashboard");
       router.refresh();
     } catch {

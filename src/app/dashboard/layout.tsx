@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { isTokenExpired } from "@/lib/api";
+import { apiFetch, clearLegacyClientSession } from "@/lib/api";
 import {
   IconAds,
   IconClients,
@@ -61,44 +61,38 @@ function DashboardLayoutShell({
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const logoutRef = useRef<() => void>(() => {});
 
   function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    document.cookie = "ewe_token=; path=/; max-age=0";
-    router.replace("/login");
-    router.refresh();
+    void apiFetch("/api/auth/logout", { method: "POST" }).finally(() => {
+      clearLegacyClientSession();
+      router.replace("/login");
+      router.refresh();
+    });
   }
 
-  logoutRef.current = logout;
-
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-    if (isTokenExpired()) {
-      logout();
-      return;
-    }
-    try {
-      const raw = localStorage.getItem("user");
-      if (raw) setUser(JSON.parse(raw) as StoredUser);
-    } catch {
-      setUser(null);
-    }
-    setMounted(true);
+    let cancelled = false;
+    clearLegacyClientSession();
 
-    const interval = setInterval(() => {
-      if (isTokenExpired()) {
-        clearInterval(interval);
-        logoutRef.current();
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me");
+        if (!res.ok) {
+          router.replace("/login");
+          return;
+        }
+        const data = (await res.json()) as { user?: StoredUser };
+        if (cancelled) return;
+        setUser(data.user ?? null);
+        setMounted(true);
+      } catch {
+        if (!cancelled) router.replace("/login");
       }
-    }, 60 * 1000);
+    })();
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {

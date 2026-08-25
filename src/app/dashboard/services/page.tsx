@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
 import {
   hasValidServiceAreaPolygon,
@@ -323,7 +323,7 @@ export default function ServicesPage() {
     if (statusFilter === "active") params.set("isActive", "true");
     if (statusFilter === "inactive") params.set("isActive", "false");
     const q = params.toString() ? `?${params}` : "";
-    fetch(apiPath(`/api/services${q}`), { headers: authHeaders() })
+    apiFetch(`/api/services${q}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setServices(Array.isArray(data) ? data : []))
       .catch(() => setServices([]))
@@ -419,7 +419,7 @@ export default function ServicesPage() {
       closing_hour: form.closingHour.trim(),
     };
     try {
-      const res = await fetch(apiPath(url), {
+      const res = await apiFetch(url, {
         method,
         headers: authHeaders(),
         body: JSON.stringify(body),
@@ -475,7 +475,7 @@ export default function ServicesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este servicio?")) return;
-    const res = await fetch(apiPath(`/api/services/${id}`), {
+    const res = await apiFetch(`/api/services/${id}`, {
       method: "DELETE",
       headers: authHeaders(),
     });
@@ -486,7 +486,7 @@ export default function ServicesPage() {
     setTogglingId(service.id);
     try {
       const hours = serviceHours(service);
-      const res = await fetch(apiPath(`/api/services/${service.id}`), {
+      const res = await apiFetch(`/api/services/${service.id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -519,19 +519,12 @@ export default function ServicesPage() {
     }
     setLogoUploading(true);
     try {
-      const token = getToken();
-      if (!token) {
-        alert("Sesión expirada. Vuelve a iniciar sesión.");
-        return;
-      }
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("token", token);
-      const res = await fetch(apiPath("/api/upload/service-logo"), {
+      const res = await apiFetch("/api/upload/service-logo", {
         method: "POST",
         headers: {
           ...authHeadersForUpload(),
-          "X-Auth-Token": token,
         },
         body: formData,
       });

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
-import { apiPath, authHeaders } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 export type PendingOrderAlert = {
   id: string;
@@ -107,7 +107,7 @@ export function DashboardOrderAlertsProvider({ children }: { children: ReactNode
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     pollingRef.current = true;
     try {
-      const res = await fetch(apiPath("/api/admin/orders/notifications/summary"), {
+      const res = await apiFetch("/api/admin/orders/notifications/summary", {
         headers: authHeaders(),
       });
       if (!res.ok) return;

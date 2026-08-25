@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, authHeadersForUpload, getToken, apiPath, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 
 type DeliveryStatus = "OFFLINE" | "ONLINE" | "ON_DELIVERY";
 
@@ -85,7 +85,7 @@ export default function DeliveryMenPage() {
 
   function load() {
     setLoading(true);
-    fetch(apiPath("/api/delivery-men"), { headers: authHeaders() })
+    apiFetch("/api/delivery-men", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setList(Array.isArray(data) ? data : []))
       .catch(() => setList([]))
@@ -167,7 +167,7 @@ export default function DeliveryMenPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (editId) {
-      const res = await fetch(apiPath(`/api/delivery-men/${editId}`), {
+      const res = await apiFetch(`/api/delivery-men/${editId}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -189,7 +189,7 @@ export default function DeliveryMenPage() {
         return;
       }
     } else {
-      const res = await fetch(apiPath("/api/delivery-men"), {
+      const res = await apiFetch("/api/delivery-men", {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -223,19 +223,13 @@ export default function DeliveryMenPage() {
       alert("Solo se permiten imágenes (JPEG, PNG, GIF, WebP).");
       return;
     }
-    const token = getToken();
-    if (!token) {
-      alert("Sesión expirada. Vuelve a iniciar sesión.");
-      return;
-    }
     setProfilePhotoUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("token", token);
-      const res = await fetch(apiPath("/api/upload/delivery-profile"), {
+      const res = await apiFetch("/api/upload/delivery-profile", {
         method: "POST",
-        headers: { ...authHeadersForUpload(), "X-Auth-Token": token },
+        headers: { ...authHeadersForUpload() },
         body: formData,
       });
       const data = await res.json();
@@ -257,21 +251,15 @@ export default function DeliveryMenPage() {
       alert("Solo se permiten imágenes (JPEG, PNG, GIF, WebP).");
       return;
     }
-    const token = getToken();
-    if (!token) {
-      alert("Sesión expirada. Vuelve a iniciar sesión.");
-      return;
-    }
     if (side === "front") setIdFrontUploading(true);
     else setIdBackUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("token", token);
       formData.append("side", side);
-      const res = await fetch(apiPath("/api/upload/delivery-id"), {
+      const res = await apiFetch("/api/upload/delivery-id", {
         method: "POST",
-        headers: { ...authHeadersForUpload(), "X-Auth-Token": token },
+        headers: { ...authHeadersForUpload() },
         body: formData,
       });
       const data = await res.json();

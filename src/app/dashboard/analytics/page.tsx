@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authHeaders, apiPath } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
 
 const defaultFrom = () => {
   const d = new Date();
@@ -22,9 +22,9 @@ export default function AnalyticsPage() {
     setLoading(true);
     const q = `?from=${from}&to=${to}&limit=10`;
     Promise.all([
-      fetch(apiPath(`/api/analytics/best-shops${q}`), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath(`/api/analytics/best-products${q}`), { headers: authHeaders() }).then((r) => r.json()),
-      fetch(apiPath(`/api/analytics/most-requested-services${q}`), { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch(`/api/analytics/best-shops${q}`, { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch(`/api/analytics/best-products${q}`, { headers: authHeaders() }).then((r) => r.json()),
+      apiFetch(`/api/analytics/most-requested-services${q}`, { headers: authHeaders() }).then((r) => r.json()),
     ])
       .then(([shops, products, services]) => {
         setBestShops(Array.isArray(shops) ? shops : []);
