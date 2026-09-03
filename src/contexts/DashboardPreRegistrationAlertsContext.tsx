@@ -15,10 +15,11 @@ import { apiFetch, authHeaders } from "@/lib/api";
 type PendingPreRegistration = {
   id: string;
   name: string;
-  kind: "RESTAURANT" | "SHOP" | "COURIER";
+  kind: "RESTAURANT" | "SHOP" | "COURIER" | "PRODUCT";
   status: string;
   readAt: string | null;
   vehicleType?: string | null;
+  shopName?: string | null;
 };
 
 type ToastAlert = {
@@ -49,9 +50,16 @@ const KIND_LABELS: Record<PendingPreRegistration["kind"], string> = {
   RESTAURANT: "restaurante",
   SHOP: "tienda",
   COURIER: "repartidor",
+  PRODUCT: "producto",
 };
 
 function formatToastMessage(row: PendingPreRegistration): string {
+  if (row.kind === "PRODUCT") {
+    const shop = row.shopName?.trim();
+    return shop
+      ? `${shop} quiere agregar «${row.name}»`
+      : `Una tienda quiere agregar «${row.name}»`;
+  }
   const kind = KIND_LABELS[row.kind] ?? "aliado";
   if (row.kind === "COURIER" && row.vehicleType?.trim()) {
     return `Nuevo pre-registro de ${kind}: ${row.name} · ${row.vehicleType.trim()}`;
@@ -104,7 +112,7 @@ export function DashboardPreRegistrationAlertsProvider({
       Notification.permission === "granted"
     ) {
       try {
-        new Notification("Nuevo pre-registro en Dobbi", {
+        new Notification(row.kind === "PRODUCT" ? "Nuevo producto en Dobbi" : "Nuevo pre-registro en Dobbi", {
           body: message,
           tag: `pre-reg-${row.id}`,
         });

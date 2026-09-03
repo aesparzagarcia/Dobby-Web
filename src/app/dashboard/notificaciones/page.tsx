@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { apiFetch, authHeaders } from "@/lib/api";
+import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
+import { productCategoryLabel } from "@/lib/productCategories";
 import {
   ADMIN_PRE_REGISTRATIONS_CHANGED_EVENT,
   useDashboardPreRegistrationAlerts,
@@ -12,9 +13,17 @@ const POLL_MS = 12_000;
 
 type NotificationRow = {
   id: string;
-  kind: "RESTAURANT" | "SHOP" | "COURIER";
+  kind: "RESTAURANT" | "SHOP" | "COURIER" | "PRODUCT";
   shopType: "RESTAURANT" | "SHOP" | "SERVICE_PROVIDER" | "CAR_WASH" | null;
   name: string;
+  shopName: string | null;
+  productId: string | null;
+  description: string | null;
+  price: number | null;
+  imageUrls: string[];
+  category: string | null;
+  hasPromotion: boolean;
+  discount: number;
   address: string | null;
   phone: string | null;
   openingHour: string | null;
@@ -33,6 +42,7 @@ const KIND_LABELS: Record<NotificationRow["kind"], string> = {
   RESTAURANT: "Pre-registro restaurante",
   SHOP: "Pre-registro comercio",
   COURIER: "Pre-registro repartidor",
+  PRODUCT: "Producto nuevo",
 };
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
@@ -170,6 +180,26 @@ export default function NotificacionesPage() {
     }
   }
 
+  async function acceptProduct(id: string) {
+    setBusyId(id);
+    setActionError(null);
+    try {
+      const res = await apiFetch(`/api/admin/notifications/${id}/accept-product`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(typeof data.error === "string" ? data.error : "No se pudo aceptar el producto.");
+        return;
+      }
+      await load();
+      refreshNow();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function acceptCourierPreRegistration(id: string) {
     setBusyId(id);
     setActionError(null);
@@ -196,7 +226,7 @@ export default function NotificacionesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Pre-registros de aliados y repartidores desde la web pública.
+            Pre-registros de aliados y productos que las tiendas quieren publicar.
           </p>
         </div>
         <div className="flex gap-2">
@@ -282,12 +312,56 @@ export default function NotificacionesPage() {
                         {STATUS_LABELS[item.status]}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">{formatDate(item.createdAt)}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {item.kind === "PRODUCT" && item.shopName
+                        ? `${item.shopName} · ${formatDate(item.createdAt)}`
+                        : formatDate(item.createdAt)}
+                    </p>
                   </div>
                 </button>
 
                 {open && (
                   <div className="border-t border-gray-100 px-4 pb-4 pt-2 text-sm">
+                    {item.kind === "PRODUCT" ? (
+                      <div className="space-y-3">
+                        {(item.imageUrls?.length ?? 0) > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {(item.imageUrls ?? []).slice(0, 3).map((url) => (
+                              <img
+                                key={url}
+                                src={uploadsUrl(url)}
+                                alt=""
+                                className="h-20 w-20 rounded-lg object-cover border border-gray-100"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <dl className="grid gap-2 sm:grid-cols-2">
+                          <Detail label="Tienda" value={item.shopName ?? "—"} />
+                          <Detail
+                            label="Precio"
+                            value={
+                              item.price == null
+                                ? "—"
+                                : item.price.toLocaleString("es-MX", {
+                                    style: "currency",
+                                    currency: "MXN",
+                                  })
+                            }
+                          />
+                          {item.category && (
+                            <Detail label="Categoría" value={productCategoryLabel(item.category)} />
+                          )}
+                          {item.hasPromotion && item.discount > 0 && (
+                            <Detail label="Promoción" value={`${item.discount}% de descuento`} />
+                          )}
+                          {item.phone && <Detail label="Teléfono de la tienda" value={item.phone} />}
+                        </dl>
+                        {item.description && (
+                          <p className="text-gray-700 whitespace-pre-wrap">{item.description}</p>
+                        )}
+                      </div>
+                    ) : (
                     <dl className="grid gap-2 sm:grid-cols-2">
                       <Detail label="Correo" value={item.email} />
                       <Detail label="Teléfono" value={item.phone ?? "—"} />
@@ -310,8 +384,21 @@ export default function NotificacionesPage() {
                         <Detail label="Vehículo" value={item.vehicleType} />
                       )}
                     </dl>
+                    )}
 
-                    {item.status === "ACCEPTED" && item.createdShopId && (
+                    {item.status === "ACCEPTED" && item.kind === "PRODUCT" && (
+                      <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+                        Producto publicado y visible para clientes.{" "}
+                        <Link
+                          href="/dashboard/products"
+                          className="font-medium underline hover:text-green-900"
+                        >
+                          Ver en Productos
+                        </Link>
+                      </p>
+                    )}
+
+                    {item.status === "ACCEPTED" && item.kind !== "PRODUCT" && item.createdShopId && (
                       <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
                         Tienda creada correctamente.{" "}
                         <Link
@@ -336,7 +423,28 @@ export default function NotificacionesPage() {
                     )}
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {item.status === "PENDING" && (
+                      {item.kind === "PRODUCT" && (item.status === "PENDING" || item.status === "REVIEWED") && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() => acceptProduct(item.id)}
+                            className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Aceptar y publicar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() => setStatus(item.id, "DISMISSED")}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Descartar
+                          </button>
+                        </>
+                      )}
+
+                      {item.kind !== "PRODUCT" && item.status === "PENDING" && (
                         <>
                           <button
                             type="button"

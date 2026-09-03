@@ -7,6 +7,7 @@ const KIND_ICONS = {
   RESTAURANT: "🍽️",
   SHOP: "🏪",
   COURIER: "🛵",
+  PRODUCT: "🛒",
 } as const;
 
 export function PreRegistrationAlertToasts() {
@@ -30,7 +31,11 @@ export function PreRegistrationAlertToasts() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900">
-              {toast.kind === "COURIER" ? "Nuevo repartidor" : "Nuevo pre-registro"}
+              {toast.kind === "PRODUCT"
+                ? "Nuevo producto"
+                : toast.kind === "COURIER"
+                  ? "Nuevo repartidor"
+                  : "Nuevo pre-registro"}
             </p>
             <p className="text-sm text-gray-600 mt-0.5 leading-snug">{toast.message}</p>
             <div className="mt-2 flex items-center gap-3">
