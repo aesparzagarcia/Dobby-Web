@@ -28,6 +28,7 @@ type NotificationRow = {
   phone: string | null;
   openingHour: string | null;
   closingHour: string | null;
+  openingDays?: string[];
   email: string;
   vehicleType: string | null;
   status: "PENDING" | "REVIEWED" | "DISMISSED" | "ACCEPTED";
@@ -378,6 +379,24 @@ export default function NotificacionesPage() {
                           value={[item.openingHour, item.closingHour]
                             .filter(Boolean)
                             .join(" – ")}
+                        />
+                      )}
+                      {item.openingDays && item.openingDays.length > 0 && (
+                        <Detail
+                          label="Días"
+                          value={item.openingDays
+                            .map((d) =>
+                              ({
+                                MON: "Lun",
+                                TUE: "Mar",
+                                WED: "Mié",
+                                THU: "Jue",
+                                FRI: "Vie",
+                                SAT: "Sáb",
+                                SUN: "Dom",
+                              }[d] ?? d)
+                            )
+                            .join(", ")}
                         />
                       )}
                       {item.vehicleType && (

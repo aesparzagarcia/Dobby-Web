@@ -40,6 +40,8 @@ type Shop = {
   closingHour?: string | null;
   opening_hour?: string | null;
   closing_hour?: string | null;
+  openingDays?: string[] | null;
+  opening_days?: string[] | null;
 };
 
 type SortKey = "recent" | "name" | "orders" | "revenue" | "rating";
@@ -52,6 +54,36 @@ const TYPE_LABELS: Record<string, string> = {
   SERVICE_PROVIDER: "Servicios",
   CAR_WASH: "Autolavado",
 };
+
+const WEEKDAYS: { code: string; short: string; full: string }[] = [
+  { code: "MON", short: "Lun", full: "Lunes" },
+  { code: "TUE", short: "Mar", full: "Martes" },
+  { code: "WED", short: "Mié", full: "Miércoles" },
+  { code: "THU", short: "Jue", full: "Jueves" },
+  { code: "FRI", short: "Vie", full: "Viernes" },
+  { code: "SAT", short: "Sáb", full: "Sábado" },
+  { code: "SUN", short: "Dom", full: "Domingo" },
+];
+
+const ALL_WEEKDAYS = WEEKDAYS.map((d) => d.code);
+
+function shopOpeningDays(shop: Shop): string[] {
+  const raw = shop.openingDays ?? shop.opening_days ?? [];
+  const days = raw.filter((d) => ALL_WEEKDAYS.includes(d));
+  return days.length > 0 ? days : [...ALL_WEEKDAYS];
+}
+
+function formatOpeningDays(days: string[]): string {
+  const selected = WEEKDAYS.filter((d) => days.includes(d.code));
+  if (selected.length === 7) return "Todos los días";
+  if (
+    selected.length === 5 &&
+    selected.every((d) => !["SAT", "SUN"].includes(d.code))
+  ) {
+    return "Lun–Vie";
+  }
+  return selected.map((d) => d.short).join(", ");
+}
 
 function shopHours(shop: Shop): { open: string; close: string } | null {
   const open = shop.openingHour ?? shop.opening_hour ?? null;
@@ -250,7 +282,7 @@ function ShopCard({
         </p>
         {hours ? (
           <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
-            Horario: {formatHoursRange(hours.open, hours.close)}
+            {formatOpeningDays(shopOpeningDays(shop))} · {formatHoursRange(hours.open, hours.close)}
           </p>
         ) : null}
       </div>
@@ -329,6 +361,7 @@ export default function ShopsPage() {
     lng: null as number | null,
     openingHour: "",
     closingHour: "",
+    openingDays: [...ALL_WEEKDAYS],
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
@@ -350,6 +383,7 @@ export default function ShopsPage() {
     lng: null as number | null,
     openingHour: "",
     closingHour: "",
+    openingDays: [...ALL_WEEKDAYS],
   });
 
   function load() {
@@ -436,6 +470,10 @@ export default function ShopsPage() {
       alert("Indica hora de apertura y hora de cierre.");
       return;
     }
+    if (form.openingDays.length === 0) {
+      alert("Selecciona al menos un día de apertura.");
+      return;
+    }
     setLocationError(null);
     setSaving(true);
     try {
@@ -452,6 +490,7 @@ export default function ShopsPage() {
         lng: form.lng,
         opening_hour: form.openingHour.trim() || null,
         closing_hour: form.closingHour.trim() || null,
+        opening_days: form.openingDays,
       };
       const res = await apiFetch(url, {
         method,
@@ -504,6 +543,7 @@ export default function ShopsPage() {
       lng,
       openingHour: hours?.open ?? "",
       closingHour: hours?.close ?? "",
+      openingDays: shopOpeningDays(shop),
     });
     const pinned = hasValidShopLocation(lat, lng);
     setLocationFromMap(pinned);
@@ -798,6 +838,41 @@ export default function ShopsPage() {
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Días de apertura</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((day) => {
+                    const selected = form.openingDays.includes(day.code);
+                    return (
+                      <button
+                        key={day.code}
+                        type="button"
+                        title={day.full}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            openingDays: selected
+                              ? f.openingDays.filter((d) => d !== day.code)
+                              : [...f.openingDays, day.code],
+                          }))
+                        }
+                        className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          selected
+                            ? "bg-dobby-600 text-white border-dobby-600"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-dobby-300"
+                        }`}
+                      >
+                        {day.short}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {form.openingDays.length === 0
+                    ? "Selecciona al menos un día"
+                    : formatOpeningDays(form.openingDays)}
+                </p>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Horario de atención</label>
