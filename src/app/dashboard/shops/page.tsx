@@ -27,6 +27,8 @@ type Shop = {
   type: string;
   address: string;
   phone: string | null;
+  phoneSecondary?: string | null;
+  phone_secondary?: string | null;
   logoUrl: string | null;
   status: string;
   lat?: number | null;
@@ -90,6 +92,10 @@ function shopHours(shop: Shop): { open: string; close: string } | null {
   const close = shop.closingHour ?? shop.closing_hour ?? null;
   if (!open || !close) return null;
   return { open, close };
+}
+
+function shopSecondaryPhone(shop: Shop): string {
+  return shop.phoneSecondary ?? shop.phone_secondary ?? "";
 }
 
 function formatHoursRange(open: string, close: string) {
@@ -280,6 +286,11 @@ function ShopCard({
           <IconLocation className="w-3 h-3 text-dobby-500 shrink-0" />
           <span className="truncate">{shop.address}</span>
         </p>
+        {(shop.phone || shopSecondaryPhone(shop)) && (
+          <p className="text-[11px] text-gray-500 mt-0.5 truncate" title={[shop.phone, shopSecondaryPhone(shop)].filter(Boolean).join(" · ")}>
+            {[shop.phone, shopSecondaryPhone(shop)].filter(Boolean).join(" · ")}
+          </p>
+        )}
         {hours ? (
           <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
             {formatOpeningDays(shopOpeningDays(shop))} · {formatHoursRange(hours.open, hours.close)}
@@ -355,6 +366,7 @@ export default function ShopsPage() {
     type: "SHOP",
     address: "",
     phone: "",
+    phoneSecondary: "",
     logoUrl: "",
     status: "ACTIVE",
     lat: null as number | null,
@@ -377,6 +389,7 @@ export default function ShopsPage() {
     type: "SHOP",
     address: "",
     phone: "",
+    phoneSecondary: "",
     logoUrl: "",
     status: "ACTIVE",
     lat: null as number | null,
@@ -416,7 +429,9 @@ export default function ShopsPage() {
         (s) =>
           s.name.toLowerCase().includes(q) ||
           s.address.toLowerCase().includes(q) ||
-          (TYPE_LABELS[s.type] ?? "").toLowerCase().includes(q)
+          (TYPE_LABELS[s.type] ?? "").toLowerCase().includes(q) ||
+          (s.phone ?? "").toLowerCase().includes(q) ||
+          shopSecondaryPhone(s).toLowerCase().includes(q)
       );
     }
     list.sort((a, b) => {
@@ -484,6 +499,7 @@ export default function ShopsPage() {
         type: form.type,
         address: form.address,
         phone: form.phone || null,
+        phoneSecondary: form.phoneSecondary.trim() || null,
         logoUrl: form.logoUrl || null,
         status: form.status,
         lat: form.lat,
@@ -537,6 +553,7 @@ export default function ShopsPage() {
       type: shop.type,
       address: shop.address,
       phone: shop.phone || "",
+      phoneSecondary: shopSecondaryPhone(shop),
       logoUrl: shop.logoUrl || "",
       status: shop.status,
       lat,
@@ -837,6 +854,18 @@ export default function ShopsPage() {
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="10 dígitos"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Teléfono 2 <span className="font-normal text-gray-400">(opcional)</span>
+                </label>
+                <input
+                  value={form.phoneSecondary}
+                  onChange={(e) => setForm((f) => ({ ...f, phoneSecondary: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Otro celular, si aplica"
                 />
               </div>
               <div>
