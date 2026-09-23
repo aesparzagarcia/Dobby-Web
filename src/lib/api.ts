@@ -75,6 +75,6 @@ export function clearLegacyClientSession(): void {
   } catch {
     /* ignore */
   }
-  document.cookie = "ewe_token=; path=/; max-age=0";
-  document.cookie = "ewe_csrf=; path=/; max-age=0";
+  // Do not expire ewe_token / ewe_csrf from JS. ewe_token is HttpOnly; a
+  // document.cookie wipe can shadow it on iOS Safari and bounce login → dashboard → login.
 }

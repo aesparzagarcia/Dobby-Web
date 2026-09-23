@@ -26,6 +26,8 @@ type NotificationRow = {
   discount: number;
   address: string | null;
   phone: string | null;
+  phoneSecondary?: string | null;
+  phone_secondary?: string | null;
   openingHour: string | null;
   closingHour: string | null;
   openingDays?: string[];
@@ -366,6 +368,12 @@ export default function NotificacionesPage() {
                     <dl className="grid gap-2 sm:grid-cols-2">
                       <Detail label="Correo" value={item.email} />
                       <Detail label="Teléfono" value={item.phone ?? "—"} />
+                      {(item.phoneSecondary ?? item.phone_secondary) && (
+                        <Detail
+                          label="Teléfono 2"
+                          value={item.phoneSecondary ?? item.phone_secondary ?? ""}
+                        />
+                      )}
                       {item.shopType && (
                         <Detail
                           label="Tipo de negocio"

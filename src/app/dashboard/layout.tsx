@@ -72,7 +72,6 @@ function DashboardLayoutShell({
 
   useEffect(() => {
     let cancelled = false;
-    clearLegacyClientSession();
 
     (async () => {
       try {
