@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import {
   hasValidServiceAreaPolygon,
   isInsideServiceArea,
@@ -195,6 +197,7 @@ function ShopCard({
   onToggleActive: (active: boolean) => void;
   togglingActive: boolean;
 }) {
+  const { canWrite } = useAdminAccess();
   const isActive = shop.status === "ACTIVE";
   const hours = shopHours(shop);
   const rating =
@@ -254,18 +257,20 @@ function ShopCard({
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  Editar
+                  {canWrite ? "Editar" : "Ver"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleMenu();
-                    onDelete();
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Eliminar
-                </button>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleMenu();
+                      onDelete();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Eliminar
+                  </button>
+                ) : null}
               </div>
             </>
           )}
@@ -333,7 +338,7 @@ function ShopCard({
           type="button"
           role="switch"
           aria-checked={isActive}
-          disabled={togglingActive}
+          disabled={togglingActive || !canWrite}
           onClick={() => onToggleActive(!isActive)}
           className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-500/40 disabled:opacity-50 ${
             isActive ? "bg-dobby-600" : "bg-gray-200"
@@ -352,6 +357,7 @@ function ShopCard({
 }
 
 export default function ShopsPage() {
+  const { canWrite } = useAdminAccess();
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -642,14 +648,16 @@ export default function ShopsPage() {
             Administra las tiendas y restaurantes registrados en la plataforma.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
-        >
-          <IconPlus className="w-4 h-4" />
-          Añadir tienda
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
+          >
+            <IconPlus className="w-4 h-4" />
+            Añadir tienda
+          </button>
+        </WriteOnly>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 mb-6">
@@ -695,13 +703,15 @@ export default function ShopsPage() {
               : "No hay tiendas que coincidan con tu búsqueda."}
           </p>
           {shops.length === 0 && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
-            >
-              Añadir la primera tienda
-            </button>
+            <WriteOnly>
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
+              >
+                Añadir la primera tienda
+              </button>
+            </WriteOnly>
           )}
         </div>
       ) : (
@@ -784,9 +794,10 @@ export default function ShopsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              {modal === "create" ? "Nueva tienda" : "Editar tienda"}
+              {modal === "create" ? "Nueva tienda" : canWrite ? "Editar tienda" : "Detalle de tienda"}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-3">
+              <fieldset disabled={!canWrite} className="space-y-3 min-w-0 border-0 p-0 m-0">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Nombre</label>
                 <input
@@ -974,16 +985,19 @@ export default function ShopsPage() {
                   <option value="INACTIVE">Inactivo</option>
                 </select>
               </div>
+              </fieldset>
               <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={
-                    saving || !locationFromMap || !hasValidShopLocation(form.lat, form.lng)
-                  }
-                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Guardando…" : modal === "create" ? "Crear" : "Guardar"}
-                </button>
+                <WriteOnly>
+                  <button
+                    type="submit"
+                    disabled={
+                      saving || !locationFromMap || !hasValidShopLocation(form.lat, form.lng)
+                    }
+                    className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? "Guardando…" : modal === "create" ? "Crear" : "Guardar"}
+                  </button>
+                </WriteOnly>
                 <button
                   type="button"
                   disabled={saving}
@@ -995,7 +1009,7 @@ export default function ShopsPage() {
                   }}
                   className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Cancelar
+                  {canWrite ? "Cancelar" : "Cerrar"}
                 </button>
               </div>
             </form>

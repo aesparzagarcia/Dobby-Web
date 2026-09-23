@@ -42,10 +42,29 @@ function readCsrfCookie(): string | null {
  * When CSRF protection is on (`COOKIE_SAMESITE=None` or `ADMIN_CSRF=true`),
  * mutating requests send `X-CSRF-Token` from the `ewe_csrf` cookie.
  */
+let blockAdminMutations = false;
+
+/** Viewer sessions: refuse create/update/delete in the browser (backend also enforces). */
+export function setBlockAdminMutations(blocked: boolean): void {
+  blockAdminMutations = blocked;
+}
+
+function isLogoutPath(path: string): boolean {
+  return path.includes("/auth/logout") || path.includes("/auth/login");
+}
+
 export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    if (blockAdminMutations && !isLogoutPath(path)) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ error: "Solo consulta: no puedes modificar ni borrar" }),
+          { status: 403, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    }
     const csrf = readCsrfCookie();
     if (csrf && !headers.has("X-CSRF-Token")) {
       headers.set("X-CSRF-Token", csrf);

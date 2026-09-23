@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import {
   AdFormModal,
   adRecordToFormValues,
@@ -317,6 +319,7 @@ function AdMetric({
 }
 
 export default function AnunciosPage() {
+  const { canWrite } = useAdminAccess();
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"closed" | "create" | "edit">("closed");
@@ -448,14 +451,16 @@ export default function AnunciosPage() {
             Promociona negocios, productos y servicios dentro de Dobbi.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 shrink-0 bg-dobby-600 hover:bg-dobby-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-sm transition-colors"
-        >
-          <span className="text-lg leading-none">+</span>
-          Añadir anuncio
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 shrink-0 bg-dobby-600 hover:bg-dobby-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-sm transition-colors"
+          >
+            <span className="text-lg leading-none">+</span>
+            Añadir anuncio
+          </button>
+        </WriteOnly>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
@@ -530,13 +535,15 @@ export default function AnunciosPage() {
       ) : filteredAds.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <p className="text-gray-500">No hay anuncios que coincidan con tu búsqueda.</p>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="mt-4 text-dobby-600 hover:text-dobby-700 text-sm font-medium"
-          >
-            Crear el primer anuncio
-          </button>
+          <WriteOnly>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mt-4 text-dobby-600 hover:text-dobby-700 text-sm font-medium"
+            >
+              Crear el primer anuncio
+            </button>
+          </WriteOnly>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -616,16 +623,18 @@ export default function AnunciosPage() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50"
                       >
                         <IconPencil className="w-4 h-4" />
-                        Editar
+                        {canWrite ? "Editar" : "Ver"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePrimaryAction(ad)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        {action.icon}
-                        {action.label}
-                      </button>
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          onClick={() => handlePrimaryAction(ad)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          {action.icon}
+                          {action.label}
+                        </button>
+                      ) : null}
                       <div className="relative">
                         <button
                           type="button"
@@ -648,15 +657,17 @@ export default function AnunciosPage() {
                               onClick={() => openEdit(ad)}
                               className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                             >
-                              Editar
+                              {canWrite ? "Editar" : "Ver"}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(ad.id)}
-                              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              Eliminar
-                            </button>
+                            {canWrite ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(ad.id)}
+                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              >
+                                Eliminar
+                              </button>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

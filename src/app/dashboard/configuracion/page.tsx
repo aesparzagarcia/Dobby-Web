@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, authHeaders } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
 import {
   calculateDeliveryFee,
   draftToSettings,
@@ -829,15 +830,17 @@ export default function ConfiguracionPage() {
 
       {/* Save */}
       <div className="mt-10 flex justify-center">
-        <button
-          type="button"
-          onClick={saveAll}
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-dobby-600 text-white text-sm font-semibold shadow-lg shadow-dobby-600/25 hover:bg-dobby-700 disabled:opacity-50 transition-colors"
-        >
-          <IconSave className="w-5 h-5" />
-          {saving ? "Guardando…" : "Guardar cambios"}
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-dobby-600 text-white text-sm font-semibold shadow-lg shadow-dobby-600/25 hover:bg-dobby-700 disabled:opacity-50 transition-colors"
+          >
+            <IconSave className="w-5 h-5" />
+            {saving ? "Guardando…" : "Guardar cambios"}
+          </button>
+        </WriteOnly>
       </div>
     </div>
   );

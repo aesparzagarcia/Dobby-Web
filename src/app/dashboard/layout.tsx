@@ -31,8 +31,7 @@ import {
   DashboardPreRegistrationAlertsProvider,
   useDashboardPreRegistrationAlerts,
 } from "@/contexts/DashboardPreRegistrationAlertsContext";
-
-type StoredUser = { email?: string; name?: string; lastName?: string };
+import { AdminAccessProvider, useAdminAccess } from "@/contexts/AdminAccessContext";
 
 const nav = [
   { href: "/dashboard", label: "Resumen", icon: IconDashboard, badgeKey: null as string | null },
@@ -56,10 +55,9 @@ function DashboardLayoutShell({
 }) {
   const { badgeCount } = useDashboardOrderAlerts();
   const { badgeCount: notificationBadge } = useDashboardPreRegistrationAlerts();
+  const { user, ready, readOnly } = useAdminAccess();
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<StoredUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function logout() {
@@ -69,30 +67,6 @@ function DashboardLayoutShell({
       router.refresh();
     });
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await apiFetch("/api/auth/me");
-        if (!res.ok) {
-          router.replace("/login");
-          return;
-        }
-        const data = (await res.json()) as { user?: StoredUser };
-        if (cancelled) return;
-        setUser(data.user ?? null);
-        setMounted(true);
-      } catch {
-        if (!cancelled) router.replace("/login");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -124,7 +98,7 @@ function DashboardLayoutShell({
     return () => mediaQuery.removeEventListener("change", onChange);
   }, []);
 
-  if (!mounted) {
+  if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dobby-page">
         <p className="text-gray-500">Cargando…</p>
@@ -133,7 +107,8 @@ function DashboardLayoutShell({
   }
 
   const displayName =
-    [user?.name, user?.lastName].filter(Boolean).join(" ").trim() || "Admin Dobbi";
+    [user?.name, user?.lastName].filter(Boolean).join(" ").trim() ||
+    (readOnly ? "Consulta Dobbi" : "Admin Dobbi");
 
   return (
     <div className="min-h-screen flex bg-dobby-page">
@@ -213,6 +188,9 @@ function DashboardLayoutShell({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
               <p className="text-xs text-gray-500 truncate">{user?.email ?? ""}</p>
+              {readOnly ? (
+                <p className="text-[10px] font-medium text-amber-700 mt-0.5">Solo consulta</p>
+              ) : null}
             </div>
           </div>
           <button
@@ -241,7 +219,14 @@ function DashboardLayoutShell({
             <span className="font-bold text-base text-gray-900 tracking-tight truncate">Dobbi</span>
           </Link>
         </header>
-        <main className="flex-1 min-w-0 overflow-auto">{children}</main>
+        <main className="flex-1 min-w-0 overflow-auto">
+          {readOnly ? (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-900">
+              Esta cuenta solo puede consultar. No puede crear, modificar ni borrar.
+            </div>
+          ) : null}
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -253,10 +238,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardOrderAlertsProvider>
-      <DashboardPreRegistrationAlertsProvider>
-        <DashboardLayoutShell>{children}</DashboardLayoutShell>
-      </DashboardPreRegistrationAlertsProvider>
-    </DashboardOrderAlertsProvider>
+    <AdminAccessProvider>
+      <DashboardOrderAlertsProvider>
+        <DashboardPreRegistrationAlertsProvider>
+          <DashboardLayoutShell>{children}</DashboardLayoutShell>
+        </DashboardPreRegistrationAlertsProvider>
+      </DashboardOrderAlertsProvider>
+    </AdminAccessProvider>
   );
 }

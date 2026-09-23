@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import {
   hasValidServiceAreaPolygon,
   isInsideServiceArea,
@@ -148,6 +150,7 @@ function ServiceCard({
   onToggleActive: (active: boolean) => void;
   togglingActive: boolean;
 }) {
+  const { canWrite } = useAdminAccess();
   const headerBg = CATEGORY_HEADER_BG[service.category] ?? CATEGORY_HEADER_BG.OTHER;
   const hours = serviceHours(service);
   const commissionPct = service.commissionRatePercent ?? 2.5;
@@ -206,18 +209,20 @@ function ServiceCard({
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  Editar
+                  {canWrite ? "Editar" : "Ver"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleMenu();
-                    onDelete();
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Eliminar
-                </button>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleMenu();
+                      onDelete();
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Eliminar
+                  </button>
+                ) : null}
               </div>
             </>
           )}
@@ -280,7 +285,7 @@ function ServiceCard({
           type="button"
           role="switch"
           aria-checked={service.isActive}
-          disabled={togglingActive}
+          disabled={togglingActive || !canWrite}
           onClick={() => onToggleActive(!service.isActive)}
           className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-500/40 disabled:opacity-50 ${
             service.isActive ? "bg-dobby-600" : "bg-gray-200"
@@ -299,6 +304,7 @@ function ServiceCard({
 }
 
 export default function ServicesPage() {
+  const { canWrite } = useAdminAccess();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -551,14 +557,16 @@ export default function ServicesPage() {
             Administra los servicios de pago y utilidades integradas en la plataforma.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
-        >
-          <IconPlus className="w-4 h-4" />
-          Añadir servicio
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 shrink-0"
+          >
+            <IconPlus className="w-4 h-4" />
+            Añadir servicio
+          </button>
+        </WriteOnly>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 mb-6">
@@ -603,13 +611,15 @@ export default function ServicesPage() {
               : "No hay servicios que coincidan con tu búsqueda."}
           </p>
           {services.length === 0 && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
-            >
-              Añadir el primer servicio
-            </button>
+            <WriteOnly>
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-800"
+              >
+                Añadir el primer servicio
+              </button>
+            </WriteOnly>
           )}
         </div>
       ) : (
@@ -692,9 +702,10 @@ export default function ServicesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              {modal === "create" ? "Nuevo servicio" : "Editar servicio"}
+              {modal === "create" ? "Nuevo servicio" : canWrite ? "Editar servicio" : "Detalle de servicio"}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-3">
+              <fieldset disabled={!canWrite} className="space-y-3 min-w-0 border-0 p-0 m-0">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Logo del servicio</label>
                 <input
@@ -842,16 +853,19 @@ export default function ServicesPage() {
                   Activo
                 </label>
               </div>
+              </fieldset>
               <div className="flex flex-wrap gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={
-                    saving || !locationFromMap || !hasValidServiceLocation(form.lat, form.lng)
-                  }
-                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Guardando…" : modal === "create" ? "Crear" : "Guardar"}
-                </button>
+                <WriteOnly>
+                  <button
+                    type="submit"
+                    disabled={
+                      saving || !locationFromMap || !hasValidServiceLocation(form.lat, form.lng)
+                    }
+                    className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? "Guardando…" : modal === "create" ? "Crear" : "Guardar"}
+                  </button>
+                </WriteOnly>
                 <button
                   type="button"
                   disabled={saving}
@@ -863,23 +877,25 @@ export default function ServicesPage() {
                   }}
                   className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Cancelar
+                  {canWrite ? "Cancelar" : "Cerrar"}
                 </button>
-                {modal === "edit" && editId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm("¿Eliminar este servicio?")) {
-                        handleDelete(editId);
-                        setModal("closed");
-                        setEditId(null);
-                      }
-                    }}
-                    className="w-full text-red-600 hover:underline text-sm py-1"
-                  >
-                    Eliminar servicio
-                  </button>
-                )}
+                <WriteOnly>
+                  {modal === "edit" && editId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("¿Eliminar este servicio?")) {
+                          handleDelete(editId);
+                          setModal("closed");
+                          setEditId(null);
+                        }
+                      }}
+                      className="w-full text-red-600 hover:underline text-sm py-1"
+                    >
+                      Eliminar servicio
+                    </button>
+                  )}
+                </WriteOnly>
               </div>
             </form>
           </div>

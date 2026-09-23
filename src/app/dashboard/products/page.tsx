@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import {
   CAR_WASH_PRODUCT_CATEGORY,
   DEFAULT_PRODUCT_CATEGORY,
@@ -118,6 +120,7 @@ function ProductCard({
   onToggleActive: (active: boolean) => void;
   togglingActive: boolean;
 }) {
+  const { canWrite } = useAdminAccess();
   const displayPrice =
     p.hasPromotion && p.discount > 0
       ? getDiscountedPrice(p.price, p.discount)
@@ -170,7 +173,7 @@ function ProductCard({
         role="switch"
         aria-checked={p.isActive}
         aria-label={p.isActive ? "Desactivar producto" : "Activar producto"}
-        disabled={togglingActive}
+        disabled={togglingActive || !canWrite}
         onClick={() => onToggleActive(!p.isActive)}
         className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400/40 disabled:opacity-50 ${
           p.isActive ? "bg-gray-900" : "bg-gray-200"
@@ -257,6 +260,7 @@ function ProductCard({
 }
 
 export default function ProductsPage() {
+  const { canWrite } = useAdminAccess();
   const [products, setProducts] = useState<Product[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -525,14 +529,16 @@ export default function ProductsPage() {
             Explora nuestro catálogo de alimentos y bebidas
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 bg-dobby-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-dobby-700 transition shrink-0"
-        >
-          <IconPlus className="w-5 h-5" />
-          Añadir producto
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 bg-dobby-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-dobby-700 transition shrink-0"
+          >
+            <IconPlus className="w-5 h-5" />
+            Añadir producto
+          </button>
+        </WriteOnly>
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
@@ -611,13 +617,15 @@ export default function ProductsPage() {
               : "No hay productos que coincidan con tu búsqueda."}
           </p>
           {products.length === 0 && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-700"
-            >
-              Crear el primero →
-            </button>
+            <WriteOnly>
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mt-4 text-sm font-medium text-dobby-600 hover:text-dobby-700"
+              >
+                Crear el primero →
+              </button>
+            </WriteOnly>
           )}
         </div>
       ) : (
@@ -675,9 +683,10 @@ export default function ProductsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold mb-4">
-              {modal === "create" ? "Nuevo producto" : "Editar producto"}
+              {modal === "create" ? "Nuevo producto" : canWrite ? "Editar producto" : "Detalle de producto"}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-3">
+              <fieldset disabled={!canWrite} className="space-y-3 min-w-0 border-0 p-0 m-0">
               {modal === "create" && (
                 <div>
                   <label className="block text-sm text-gray-600">Tienda</label>
@@ -828,19 +837,22 @@ export default function ProductsPage() {
                   Activo
                 </label>
               </div>
+              </fieldset>
               <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  className="bg-dobby-600 text-white px-4 py-2 rounded-lg hover:bg-dobby-700"
-                >
-                  {modal === "create" ? "Crear" : "Guardar"}
-                </button>
+                <WriteOnly>
+                  <button
+                    type="submit"
+                    className="bg-dobby-600 text-white px-4 py-2 rounded-lg hover:bg-dobby-700"
+                  >
+                    {modal === "create" ? "Crear" : "Guardar"}
+                  </button>
+                </WriteOnly>
                 <button
                   type="button"
                   onClick={() => setModal("closed")}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-50"
                 >
-                  Cancelar
+                  {canWrite ? "Cancelar" : "Cerrar"}
                 </button>
               </div>
             </form>

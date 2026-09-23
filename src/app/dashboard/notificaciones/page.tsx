@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import { productCategoryLabel } from "@/lib/productCategories";
 import {
   ADMIN_PRE_REGISTRATIONS_CHANGED_EVENT,
@@ -74,6 +76,7 @@ function isShopPreRegistration(item: NotificationRow) {
 }
 
 export default function NotificacionesPage() {
+  const { canWrite } = useAdminAccess();
   const { refreshNow } = useDashboardPreRegistrationAlerts();
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -286,7 +289,7 @@ export default function NotificacionesPage() {
                   onClick={() => {
                     setExpandedId(open ? null : item.id);
                     setActionError(null);
-                    if (item.isUnread) void markRead(item.id);
+                    if (item.isUnread && canWrite) void markRead(item.id);
                   }}
                   className="flex w-full items-start gap-3 p-4 text-left hover:bg-gray-50"
                 >
@@ -450,6 +453,8 @@ export default function NotificacionesPage() {
                     )}
 
                     <div className="mt-4 flex flex-wrap gap-2">
+                      {canWrite ? (
+                        <>
                       {item.kind === "PRODUCT" && (item.status === "PENDING" || item.status === "REVIEWED") && (
                         <>
                           <button
@@ -533,6 +538,8 @@ export default function NotificacionesPage() {
                           </button>
                         </>
                       )}
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 )}

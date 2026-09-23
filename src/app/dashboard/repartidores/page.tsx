@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 
 type DeliveryStatus = "OFFLINE" | "ONLINE" | "ON_DELIVERY";
 
@@ -65,6 +67,7 @@ function StarIcon({ className = "w-4 h-4" }: { className?: string }) {
 }
 
 export default function DeliveryMenPage() {
+  const { canWrite } = useAdminAccess();
   const [list, setList] = useState<DeliveryMan[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"closed" | "create" | "edit">("closed");
@@ -289,14 +292,16 @@ export default function DeliveryMenPage() {
             Lista de personal de reparto. Haz clic en una tarjeta para editar. El estado se puede cambiar al editar.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 shrink-0 bg-dobby-600 hover:bg-dobby-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition-colors"
-        >
-          <span className="text-lg leading-none">+</span>
-          Añadir repartidor
-        </button>
+        <WriteOnly>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 shrink-0 bg-dobby-600 hover:bg-dobby-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition-colors"
+          >
+            <span className="text-lg leading-none">+</span>
+            Añadir repartidor
+          </button>
+        </WriteOnly>
       </div>
 
       <div className="mt-6 flex flex-col lg:flex-row gap-3 lg:items-center">
@@ -414,7 +419,7 @@ export default function DeliveryMenPage() {
                           onClick={() => openEdit(d)}
                           className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                          Editar
+                          {canWrite ? "Editar" : "Ver"}
                         </button>
                       </div>
                     ) : null}
@@ -468,7 +473,7 @@ export default function DeliveryMenPage() {
                     onClick={() => openEdit(d)}
                     className="flex items-center justify-center gap-1 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                   >
-                    Editar
+                    {canWrite ? "Editar" : "Ver"}
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
@@ -541,9 +546,10 @@ export default function DeliveryMenPage() {
         >
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {modal === "create" ? "Nuevo repartidor" : "Editar repartidor"}
+              {modal === "create" ? "Nuevo repartidor" : canWrite ? "Editar repartidor" : "Detalle de repartidor"}
             </h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <fieldset disabled={!canWrite} className="contents">
               <div className="sm:col-span-2">
                 <label className="block text-sm text-gray-600 mb-1">Foto de perfil</label>
                 <input
@@ -739,13 +745,16 @@ export default function DeliveryMenPage() {
                 </div>
               </div>
 
+              </fieldset>
               <div className="sm:col-span-2 flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  className="bg-dobby-600 hover:bg-dobby-700 text-white px-5 py-2 rounded-lg font-medium transition-colors"
-                >
-                  {modal === "create" ? "Crear repartidor" : "Guardar"}
-                </button>
+                <WriteOnly>
+                  <button
+                    type="submit"
+                    className="bg-dobby-600 hover:bg-dobby-700 text-white px-5 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {modal === "create" ? "Crear repartidor" : "Guardar"}
+                  </button>
+                </WriteOnly>
                 <button
                   type="button"
                   onClick={() => {
@@ -755,7 +764,7 @@ export default function DeliveryMenPage() {
                   }}
                   className="border border-gray-200 px-5 py-2 rounded-lg hover:bg-gray-50 text-gray-700"
                 >
-                  Cancelar
+                  {canWrite ? "Cancelar" : "Cerrar"}
                 </button>
               </div>
             </form>

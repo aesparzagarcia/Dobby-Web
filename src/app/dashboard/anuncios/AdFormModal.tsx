@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
+import { WriteOnly } from "@/components/dashboard/WriteOnly";
+import { useAdminAccess } from "@/contexts/AdminAccessContext";
 
 const ShopLocationPickerMap = dynamic(
   () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
@@ -412,6 +414,7 @@ type AdFormModalProps = {
 };
 
 export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onDelete }: AdFormModalProps) {
+  const { canWrite } = useAdminAccess();
   const [form, setForm] = useState<AdFormValues>(initialValues);
   const [shops, setShops] = useState<ShopOption[]>([]);
   const [saving, setSaving] = useState(false);
@@ -562,7 +565,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                {mode === "create" ? "Nuevo anuncio" : "Editar anuncio"}
+                {mode === "create" ? "Nuevo anuncio" : canWrite ? "Editar anuncio" : "Detalle de anuncio"}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 Crea un anuncio atractivo para promocionar tu negocio en Dobbi.
@@ -580,7 +583,8 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <fieldset disabled={!canWrite} className="flex-1 overflow-y-auto px-6 py-5 min-w-0 border-0 p-0 m-0">
+          <div className="px-6 py-5">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2 space-y-5">
                 <SectionCard
@@ -1080,6 +1084,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
               </div>
             </div>
           </div>
+          </fieldset>
 
           <div className="flex items-center justify-between gap-3 px-6 py-4 bg-white border-t border-gray-100 shrink-0">
             <button
@@ -1087,27 +1092,29 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              Cancelar
+              {canWrite ? "Cancelar" : "Cerrar"}
             </button>
-            <div className="flex items-center gap-2">
-              {mode === "edit" && editId && onDelete ? (
+            <WriteOnly>
+              <div className="flex items-center gap-2">
+                {mode === "edit" && editId && onDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(editId)}
+                    className="px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Eliminar
+                  </button>
+                ) : null}
                 <button
-                  type="button"
-                  onClick={() => onDelete(editId)}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50"
+                  type="submit"
+                  disabled={saving || imageUploading || logoUploading}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 disabled:opacity-60"
                 >
-                  Eliminar
+                  <IconSave className="w-4 h-4" />
+                  {saving ? "Guardando…" : mode === "create" ? "Crear anuncio" : "Guardar cambios"}
                 </button>
-              ) : null}
-              <button
-                type="submit"
-                disabled={saving || imageUploading || logoUploading}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 disabled:opacity-60"
-              >
-                <IconSave className="w-4 h-4" />
-                {saving ? "Guardando…" : mode === "create" ? "Crear anuncio" : "Guardar cambios"}
-              </button>
-            </div>
+              </div>
+            </WriteOnly>
           </div>
         </form>
       </div>
