@@ -229,14 +229,7 @@ function DashboardLayoutShell({
             <span className="font-bold text-base text-gray-900 tracking-tight truncate">Dobbi</span>
           </Link>
         </header>
-        <main className="flex-1 min-w-0 overflow-auto">
-          {readOnly ? (
-            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-900">
-              Esta cuenta solo puede consultar. No puede crear, modificar ni borrar.
-            </div>
-          ) : null}
-          {children}
-        </main>
+        <main className="flex-1 min-w-0 overflow-auto">{children}</main>
       </div>
     </div>
   );
