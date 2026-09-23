@@ -32,20 +32,21 @@ import {
   useDashboardPreRegistrationAlerts,
 } from "@/contexts/DashboardPreRegistrationAlertsContext";
 import { AdminAccessProvider, useAdminAccess } from "@/contexts/AdminAccessContext";
+import { isOwnerOnlyAdminPath } from "@/lib/adminAccess";
 
 const nav = [
-  { href: "/dashboard", label: "Resumen", icon: IconDashboard, badgeKey: null as string | null },
-  { href: "/dashboard/income", label: "Ingresos", icon: IconIncome, badgeKey: null },
-  { href: "/dashboard/pedidos", label: "Pedidos", icon: IconOrders, badgeKey: "orders" as const },
-  { href: "/dashboard/clientes", label: "Clientes", icon: IconClients, badgeKey: null },
-  { href: "/dashboard/shops", label: "Tiendas", icon: IconShop, badgeKey: null },
-  { href: "/dashboard/notificaciones", label: "Notificaciones", icon: IconNotifications, badgeKey: "notifications" as const },
-  { href: "/dashboard/services", label: "Servicios", icon: IconServices, badgeKey: null },
-  { href: "/dashboard/products", label: "Productos", icon: IconProducts, badgeKey: null },
-  { href: "/dashboard/anuncios", label: "Anuncios", icon: IconAds, badgeKey: null },
-  { href: "/dashboard/configuracion", label: "Tarifas de envío", icon: IconShipping, badgeKey: null },
-  { href: "/dashboard/repartidores", label: "Repartidores", icon: IconDrivers, badgeKey: null },
-  { href: "/dashboard/analytics", label: "Estadísticas", icon: IconStats, badgeKey: null },
+  { href: "/dashboard", label: "Resumen", icon: IconDashboard, badgeKey: null as string | null, ownerOnly: false },
+  { href: "/dashboard/income", label: "Ingresos", icon: IconIncome, badgeKey: null, ownerOnly: true },
+  { href: "/dashboard/pedidos", label: "Pedidos", icon: IconOrders, badgeKey: "orders" as const, ownerOnly: false },
+  { href: "/dashboard/clientes", label: "Clientes", icon: IconClients, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/shops", label: "Tiendas", icon: IconShop, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/notificaciones", label: "Notificaciones", icon: IconNotifications, badgeKey: "notifications" as const, ownerOnly: false },
+  { href: "/dashboard/services", label: "Servicios", icon: IconServices, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/products", label: "Productos", icon: IconProducts, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/anuncios", label: "Anuncios", icon: IconAds, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/configuracion", label: "Tarifas de envío", icon: IconShipping, badgeKey: null, ownerOnly: true },
+  { href: "/dashboard/repartidores", label: "Repartidores", icon: IconDrivers, badgeKey: null, ownerOnly: false },
+  { href: "/dashboard/analytics", label: "Estadísticas", icon: IconStats, badgeKey: null, ownerOnly: true },
 ];
 
 function DashboardLayoutShell({
@@ -71,6 +72,13 @@ function DashboardLayoutShell({
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!ready || !readOnly) return;
+    if (isOwnerOnlyAdminPath(pathname)) {
+      router.replace("/dashboard");
+    }
+  }, [ready, readOnly, pathname, router]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -148,7 +156,9 @@ function DashboardLayoutShell({
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {nav.map((item) => {
+          {nav
+            .filter((item) => !item.ownerOnly || !readOnly)
+            .map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (

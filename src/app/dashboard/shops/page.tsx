@@ -49,6 +49,7 @@ type Shop = {
 };
 
 type SortKey = "recent" | "name" | "orders" | "revenue" | "rating";
+type TypeFilter = "" | "SHOP" | "RESTAURANT" | "CAR_WASH" | "SERVICE_PROVIDER";
 
 const PAGE_SIZE = 16;
 
@@ -362,6 +363,7 @@ export default function ShopsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
   const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [page, setPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -425,11 +427,14 @@ export default function ShopsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, statusFilter, sortBy]);
+  }, [searchQuery, statusFilter, typeFilter, sortBy]);
 
   const filteredShops = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let list = [...shops];
+    if (typeFilter) {
+      list = list.filter((s) => s.type === typeFilter);
+    }
     if (q) {
       list = list.filter(
         (s) =>
@@ -459,7 +464,7 @@ export default function ShopsPage() {
       }
     });
     return list;
-  }, [shops, searchQuery, sortBy]);
+  }, [shops, searchQuery, typeFilter, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredShops.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -672,6 +677,17 @@ export default function ShopsPage() {
           />
         </div>
         <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
+        >
+          <option value="">Tipo: Todos</option>
+          <option value="SHOP">Tipo: Comercios</option>
+          <option value="RESTAURANT">Tipo: Restaurantes</option>
+          <option value="CAR_WASH">Tipo: Autolavados</option>
+          <option value="SERVICE_PROVIDER">Tipo: Servicios</option>
+        </select>
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
@@ -683,11 +699,11 @@ export default function ShopsPage() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
+          className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[220px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="recent">Ordenar por: Más recientes</option>
           <option value="name">Ordenar por: Nombre</option>
-          <option value="orders">Ordenar por: Más pedidos</option>
+          <option value="orders">Ordenar por: Que más vende</option>
           <option value="revenue">Ordenar por: Mayor ingreso</option>
           <option value="rating">Ordenar por: Mejor calificación</option>
         </select>

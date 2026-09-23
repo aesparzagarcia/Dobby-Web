@@ -25,13 +25,14 @@ type Product = {
   isActive: boolean;
   category?: string;
   createdAt?: string;
+  quantitySold?: number;
   shop: { name: string; type?: string };
 };
 
 type Shop = { id: string; name: string; type?: string };
 
 type CategoryFilter = "all" | "bebidas" | "alcohol" | "comidas" | "postres" | "autolavado";
-type SortKey = "recent" | "name" | "price_asc" | "price_desc";
+type SortKey = "recent" | "name" | "price_asc" | "price_desc" | "sold";
 type ViewMode = "grid" | "list";
 
 const CATEGORY_TABS: { id: CategoryFilter; label: string; icon: string }[] = [
@@ -159,6 +160,9 @@ function ProductCard({
       </h3>
       <p className="text-sm text-gray-500 truncate mt-0.5" title={p.shop?.name}>
         {p.shop?.name ?? "—"}
+      </p>
+      <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
+        {p.quantitySold ?? 0} vendido{(p.quantitySold ?? 0) === 1 ? "" : "s"}
       </p>
     </>
   );
@@ -331,6 +335,8 @@ export default function ProductsPage() {
           return Number(a.price) - Number(b.price);
         case "price_desc":
           return Number(b.price) - Number(a.price);
+        case "sold":
+          return (b.quantitySold ?? 0) - (a.quantitySold ?? 0);
         case "recent":
         default:
           return (
@@ -582,6 +588,7 @@ export default function ProductsPage() {
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
           >
             <option value="recent">Más recientes</option>
+            <option value="sold">Más vendido</option>
             <option value="name">Nombre A–Z</option>
             <option value="price_asc">Precio: menor a mayor</option>
             <option value="price_desc">Precio: mayor a menor</option>
