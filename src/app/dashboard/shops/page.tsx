@@ -31,6 +31,8 @@ type Shop = {
   phone: string | null;
   phoneSecondary?: string | null;
   phone_secondary?: string | null;
+  email?: string | null;
+  membership?: string | null;
   logoUrl: string | null;
   status: string;
   lat?: number | null;
@@ -99,6 +101,29 @@ function shopHours(shop: Shop): { open: string; close: string } | null {
 
 function shopSecondaryPhone(shop: Shop): string {
   return shop.phoneSecondary ?? shop.phone_secondary ?? "";
+}
+
+function mexicoTodayInput(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(new Date());
+}
+
+function isoToDateInput(iso?: string): string {
+  if (!iso) return mexicoTodayInput();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return mexicoTodayInput();
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(d);
+}
+
+function formatShopDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
 }
 
 function formatHoursRange(open: string, close: string) {
@@ -200,6 +225,7 @@ function ShopCard({
 }) {
   const { canWrite } = useAdminAccess();
   const isActive = shop.status === "ACTIVE";
+  const membershipActive = (shop.membership ?? "ACTIVE") === "ACTIVE";
   const hours = shopHours(shop);
   const rating =
     shop.ratingCount && shop.ratingCount > 0 && shop.rate != null
@@ -297,6 +323,19 @@ function ShopCard({
             {[shop.phone, shopSecondaryPhone(shop)].filter(Boolean).join(" · ")}
           </p>
         )}
+        {shop.email ? (
+          <p className="text-[11px] text-gray-500 mt-0.5 truncate" title={shop.email}>
+            {shop.email}
+          </p>
+        ) : null}
+        {shop.createdAt ? (
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Registro: {formatShopDate(shop.createdAt)}
+          </p>
+        ) : null}
+        <p className="text-[11px] text-gray-500 mt-0.5">
+          Membresía: {membershipActive ? "Activa" : "Inactiva"}
+        </p>
         {hours ? (
           <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
             {formatOpeningDays(shopOpeningDays(shop))} · {formatHoursRange(hours.open, hours.close)}
@@ -375,6 +414,9 @@ export default function ShopsPage() {
     address: "",
     phone: "",
     phoneSecondary: "",
+    email: "",
+    registeredAt: mexicoTodayInput(),
+    membership: "ACTIVE",
     logoUrl: "",
     status: "ACTIVE",
     lat: null as number | null,
@@ -398,6 +440,9 @@ export default function ShopsPage() {
     address: "",
     phone: "",
     phoneSecondary: "",
+    email: "",
+    registeredAt: mexicoTodayInput(),
+    membership: "ACTIVE",
     logoUrl: "",
     status: "ACTIVE",
     lat: null as number | null,
@@ -442,7 +487,8 @@ export default function ShopsPage() {
           s.address.toLowerCase().includes(q) ||
           (TYPE_LABELS[s.type] ?? "").toLowerCase().includes(q) ||
           (s.phone ?? "").toLowerCase().includes(q) ||
-          shopSecondaryPhone(s).toLowerCase().includes(q)
+          shopSecondaryPhone(s).toLowerCase().includes(q) ||
+          (s.email ?? "").toLowerCase().includes(q)
       );
     }
     list.sort((a, b) => {
@@ -492,6 +538,14 @@ export default function ShopsPage() {
       setMapPickerOpen(true);
       return;
     }
+    if (!form.email.trim()) {
+      alert("El correo electrónico es obligatorio.");
+      return;
+    }
+    if (!form.registeredAt) {
+      alert("Indica la fecha de registro.");
+      return;
+    }
     if (!form.openingHour.trim() || !form.closingHour.trim()) {
       alert("Indica hora de apertura y hora de cierre.");
       return;
@@ -511,6 +565,9 @@ export default function ShopsPage() {
         address: form.address,
         phone: form.phone || null,
         phoneSecondary: form.phoneSecondary.trim() || null,
+        email: form.email.trim(),
+        createdAt: form.registeredAt,
+        membership: form.membership,
         logoUrl: form.logoUrl || null,
         status: form.status,
         lat: form.lat,
@@ -565,6 +622,9 @@ export default function ShopsPage() {
       address: shop.address,
       phone: shop.phone || "",
       phoneSecondary: shopSecondaryPhone(shop),
+      email: shop.email || "",
+      registeredAt: isoToDateInput(shop.createdAt),
+      membership: shop.membership === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       logoUrl: shop.logoUrl || "",
       status: shop.status,
       lat,
@@ -894,6 +954,42 @@ export default function ShopsPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   placeholder="Otro celular, si aplica"
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Correo electrónico <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="tienda@correo.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Fecha de registro <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.registeredAt}
+                  onChange={(e) => setForm((f) => ({ ...f, registeredAt: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Membresía</label>
+                <select
+                  value={form.membership}
+                  onChange={(e) => setForm((f) => ({ ...f, membership: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="ACTIVE">Activa</option>
+                  <option value="INACTIVE">Inactiva</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Días de apertura</label>
