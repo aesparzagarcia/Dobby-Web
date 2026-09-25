@@ -552,7 +552,15 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
       const data = await res.json().catch(() => ({}));
       alert(typeof data?.error === "string" ? data.error : "Error al guardar");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo guardar");
+      const isNetwork =
+        err instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(err.message);
+      alert(
+        isNetwork
+          ? "No se pudo guardar. El servidor no respondió. Espera unos segundos e intenta de nuevo."
+          : err instanceof Error
+            ? err.message
+            : "No se pudo guardar"
+      );
     } finally {
       setSaving(false);
     }

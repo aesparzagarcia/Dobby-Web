@@ -1,7 +1,8 @@
 /**
  * Browser calls stay same-origin (`/api/...`).
- * Next.js rewrites proxy to the backend (see next.config.js + NEXT_PUBLIC_API_URL).
- * That lets the HttpOnly session cookie bind to the admin host (not cross-site).
+ * The App Router handler at `src/app/api/[...path]/route.ts` proxies to the backend
+ * (`NEXT_PUBLIC_API_URL`). That lets the HttpOnly session cookie bind to the admin host
+ * (not cross-site) and forwards PUT/POST bodies that Next.js rewrites can drop.
  */
 const BASE = "";
 
