@@ -418,6 +418,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
   const [form, setForm] = useState<AdFormValues>(initialValues);
   const [shops, setShops] = useState<ShopOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
@@ -482,28 +483,29 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!form.advertiserName.trim()) {
-      alert("El nombre del anunciante es obligatorio.");
-      return;
-    }
-    if (!form.category) {
-      alert("Selecciona una categoría.");
-      return;
-    }
-    if (!form.description.trim()) {
-      alert("La descripción es obligatoria.");
-      return;
-    }
-    if (!form.address.trim()) {
-      alert("La dirección es obligatoria.");
-      return;
-    }
-    if (!form.contactPhone.trim()) {
-      alert("El teléfono de contacto es obligatorio.");
-      return;
-    }
-    if (!form.startDate || !form.endDate) {
-      alert("Indica las fechas de inicio y fin de la campaña.");
+    setSaveError(null);
+
+    const missing: string[] = [];
+    if (!form.advertiserName.trim()) missing.push("nombre del anunciante");
+    if (!form.category) missing.push("categoría");
+    if (!form.description.trim()) missing.push("descripción");
+    if (!form.address.trim()) missing.push("dirección");
+    if (!form.contactPhone.trim()) missing.push("teléfono de contacto");
+    if (!form.startDate) missing.push("fecha de inicio");
+    if (!form.endDate) missing.push("fecha de fin");
+
+    const emptyOptional: string[] = [];
+    if (!form.imageUrl) emptyOptional.push("imagen del anuncio");
+    if (!form.logoUrl) emptyOptional.push("logo");
+    if (!form.email.trim()) emptyOptional.push("correo");
+    if (!form.linkedStoreId) emptyOptional.push("tienda relacionada");
+    if (form.amountPaid === "") emptyOptional.push("monto pagado");
+
+    if (missing.length) {
+      const msg = `Faltan campos:\n- ${missing.join("\n- ")}`;
+      console.error("[ads-save] campos vacíos", missing, form);
+      setSaveError(msg);
+      alert(msg);
       return;
     }
 
@@ -533,10 +535,12 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
       discountPercent: form.discountPercent ? Number(form.discountPercent) : null,
       buttonText: form.buttonText.trim() || null,
       buttonAction: form.buttonAction,
-      amountPaid: form.amountPaid ? Number(form.amountPaid) : null,
+      amountPaid: form.amountPaid === "" ? null : Number(form.amountPaid),
       paymentStatus: form.paymentStatus,
       linkedStoreId: form.linkedStoreId || null,
     };
+
+    console.log("[ads-save] request", method, url, body);
 
     try {
       const res = await apiFetch(url, {
@@ -544,23 +548,54 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
         headers: authHeaders(),
         body: JSON.stringify(body),
       });
+      const raw = await res.text();
+      let data: Record<string, unknown> = {};
+      try {
+        data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      } catch {
+        data = { raw };
+      }
+      console.log("[ads-save] response", res.status, data);
+
       if (res.ok) {
         onSaved();
         onClose();
         return;
       }
-      const data = await res.json().catch(() => ({}));
-      alert(typeof data?.error === "string" ? data.error : "Error al guardar");
+
+      const field = typeof data.field === "string" ? data.field : null;
+      const lines = [
+        field ? `Campo con error: ${field}` : "El servidor rechazó el guardado.",
+        `HTTP ${res.status} ${res.statusText || ""}`.trim(),
+        typeof data.error === "string" ? data.error : raw || "Error al guardar",
+        data.code != null ? `code: ${String(data.code)}` : "",
+        data.meta != null ? `meta: ${JSON.stringify(data.meta)}` : "",
+        emptyOptional.length ? `vacíos (opcionales): ${emptyOptional.join(", ")}` : "",
+      ].filter(Boolean);
+      const msg = lines.join("\n");
+      setSaveError(msg);
+      alert(msg);
     } catch (err) {
-      const isNetwork =
-        err instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(err.message);
-      alert(
-        isNetwork
-          ? "No se pudo guardar. El servidor no respondió. Espera unos segundos e intenta de nuevo."
-          : err instanceof Error
-            ? err.message
-            : "No se pudo guardar"
-      );
+      const cause =
+        err instanceof Error && "cause" in err && err.cause != null
+          ? err.cause instanceof Error
+            ? `${err.cause.name}: ${err.cause.message}`
+            : JSON.stringify(err.cause)
+          : "";
+      const msg = [
+        "Error de red al guardar (el servidor no devolvió respuesta).",
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        cause ? `cause: ${cause}` : "",
+        `método: ${method}  url: ${url}`,
+        `id: ${editId ?? "(nuevo)"}`,
+        emptyOptional.length ? `vacíos (opcionales): ${emptyOptional.join(", ")}` : "",
+        `payload: ${JSON.stringify(body, null, 2)}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      console.error("[ads-save] fetch failed", err, body);
+      setSaveError(msg);
+      alert(msg);
     } finally {
       setSaving(false);
     }
@@ -1095,6 +1130,15 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
           </div>
           </fieldset>
           </div>
+
+          {saveError ? (
+            <div className="shrink-0 border-t border-red-200 bg-red-50 px-6 py-3 max-h-40 overflow-y-auto">
+              <p className="text-xs font-semibold text-red-800 mb-1">Error al guardar</p>
+              <pre className="text-[11px] leading-snug text-red-900 whitespace-pre-wrap break-all font-mono">
+                {saveError}
+              </pre>
+            </div>
+          ) : null}
 
           <div className="flex items-center justify-between gap-3 px-6 py-4 bg-white border-t border-gray-100 shrink-0">
             <button

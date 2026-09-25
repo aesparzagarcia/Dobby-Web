@@ -119,6 +119,10 @@ async function proxy(req: NextRequest, path: string[] | undefined): Promise<Next
         error: timedOut
           ? "El servidor tardó demasiado en responder. Intenta de nuevo."
           : "No se pudo conectar con el servidor. Intenta de nuevo.",
+        field: null,
+        detail: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        method: req.method,
+        path: path?.join("/") ?? "",
       },
       { status: timedOut ? 504 : 502 }
     );
