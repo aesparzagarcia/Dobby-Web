@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import http from "node:http";
+import https from "node:https";
 import { resolveBackendUrl } from "@/lib/backendUrl";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
-const HOP_BY_HOP = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailers",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-  "content-length",
-  "content-encoding",
-]);
+const PROXY_TIMEOUT_MS = 15_000;
 
 const REQUEST_HEADERS = [
   "cookie",
@@ -27,83 +18,138 @@ const REQUEST_HEADERS = [
   "x-requested-with",
 ];
 
-type FetchInit = RequestInit & { duplex?: "half" };
+type Proxied = {
+  status: number;
+  headers: http.IncomingHttpHeaders;
+  body: Buffer;
+};
 
-async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
-  const backend = resolveBackendUrl();
-  const incoming = new URL(req.url);
-  const target = `${backend}/api/${path.join("/")}${incoming.search}`;
-
-  const headers = new Headers();
-  for (const name of REQUEST_HEADERS) {
-    const value = req.headers.get(name);
-    if (value) headers.set(name, value);
-  }
-
-  const method = req.method.toUpperCase();
-  const init: FetchInit = {
-    method,
-    headers,
-    redirect: "manual",
-    cache: "no-store",
+function proxyHttp(
+  target: string,
+  method: string,
+  reqHeaders: Headers,
+  body: Buffer
+): Promise<Proxied> {
+  const u = new URL(target);
+  const lib = u.protocol === "https:" ? https : http;
+  const headers: http.OutgoingHttpHeaders = {
+    host: u.host,
+    "content-length": body.length,
   };
-
-  if (method !== "GET" && method !== "HEAD") {
-    const buf = Buffer.from(await req.arrayBuffer());
-    if (buf.length > 0) {
-      init.body = buf;
-      init.duplex = "half";
-    }
+  for (const name of REQUEST_HEADERS) {
+    const value = reqHeaders.get(name);
+    if (value) headers[name] = value;
   }
 
-  let upstream: Response;
+  return new Promise((resolve, reject) => {
+    const req = lib.request(
+      {
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || (u.protocol === "https:" ? 443 : 80),
+        path: `${u.pathname}${u.search}`,
+        method,
+        headers,
+        timeout: PROXY_TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode || 502,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          })
+        );
+      }
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
+    req.on("error", reject);
+    if (body.length > 0) req.write(body);
+    req.end();
+  });
+}
+
+async function proxy(req: NextRequest, path: string[] | undefined): Promise<NextResponse> {
   try {
-    upstream = await fetch(target, init);
+    const segments = Array.isArray(path) ? path : [];
+    const backend = resolveBackendUrl();
+    const incoming = new URL(req.url);
+    const target = `${backend}/api/${segments.join("/")}${incoming.search}`;
+    const method = req.method.toUpperCase();
+    const body =
+      method === "GET" || method === "HEAD"
+        ? Buffer.alloc(0)
+        : Buffer.from(await req.arrayBuffer());
+
+    const upstream = await proxyHttp(target, method, req.headers, body);
+    const out = new Headers();
+    for (const [key, value] of Object.entries(upstream.headers)) {
+      if (!value) continue;
+      const lower = key.toLowerCase();
+      if (
+        lower === "transfer-encoding" ||
+        lower === "connection" ||
+        lower === "content-encoding" ||
+        lower === "content-length"
+      ) {
+        continue;
+      }
+      if (lower === "set-cookie") {
+        const cookies = Array.isArray(value) ? value : [value];
+        for (const cookie of cookies) out.append("set-cookie", cookie);
+        continue;
+      }
+      out.set(key, Array.isArray(value) ? value.join(", ") : value);
+    }
+    out.set("x-dobby-proxy", "1");
+    return new NextResponse(new Uint8Array(upstream.body), {
+      status: upstream.status,
+      headers: out,
+    });
   } catch (err) {
-    console.error("[api-proxy] fetch failed", method, target, err);
+    console.error("[api-proxy]", req.method, path?.join("/"), err);
+    const timedOut = err instanceof Error && err.message === "timeout";
     return NextResponse.json(
-      { error: "No se pudo conectar con el servidor. Intenta de nuevo." },
-      { status: 502 }
+      {
+        error: timedOut
+          ? "El servidor tardó demasiado en responder. Intenta de nuevo."
+          : "No se pudo conectar con el servidor. Intenta de nuevo.",
+      },
+      { status: timedOut ? 504 : 502 }
     );
   }
-
-  const outHeaders = new Headers();
-  upstream.headers.forEach((value, key) => {
-    if (HOP_BY_HOP.has(key.toLowerCase())) return;
-    if (key.toLowerCase() === "set-cookie") return;
-    outHeaders.append(key, value);
-  });
-
-  const getSetCookie = upstream.headers.getSetCookie?.bind(upstream.headers);
-  const setCookies = getSetCookie ? getSetCookie() : [];
-  for (const cookie of setCookies) {
-    outHeaders.append("set-cookie", cookie);
-  }
-
-  const body = await upstream.arrayBuffer();
-  return new NextResponse(body, { status: upstream.status, headers: outHeaders });
 }
 
-type RouteCtx = { params: { path: string[] } };
+type RouteCtx = { params: { path: string[] } | Promise<{ path: string[] }> };
+
+async function pathFrom(ctx: RouteCtx): Promise<string[]> {
+  const params = await ctx.params;
+  return params?.path ?? [];
+}
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function POST(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function PUT(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function PATCH(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function DELETE(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function HEAD(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
 export async function OPTIONS(req: NextRequest, ctx: RouteCtx) {
-  return proxy(req, ctx.params.path);
+  return proxy(req, await pathFrom(ctx));
 }
