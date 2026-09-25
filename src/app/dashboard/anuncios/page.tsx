@@ -334,7 +334,7 @@ export default function AnunciosPage() {
 
   function load() {
     setLoading(true);
-    apiFetch("/api/ads", { headers: authHeaders() })
+    apiFetch("/api/anuncios", { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data.map((row) => normalizeAd(row as Record<string, unknown>)) : [];
@@ -410,7 +410,7 @@ export default function AnunciosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este anuncio?")) return;
-    const res = await apiFetch(`/api/ads/${id}`, { method: "DELETE", headers: authHeaders() });
+    const res = await apiFetch(`/api/anuncios/${id}`, { method: "DELETE", headers: authHeaders() });
     if (res.ok) {
       setOpenMenuId(null);
       if (editId === id) closeModal();
@@ -419,7 +419,7 @@ export default function AnunciosPage() {
   }
 
   async function updateAdStatus(ad: Ad, status: AdStatus) {
-    const res = await apiFetch(`/api/ads/${ad.id}`, {
+    const res = await apiFetch(`/api/anuncios/${ad.id}`, {
       method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify({ status, isActive: status === "ACTIVE" }),

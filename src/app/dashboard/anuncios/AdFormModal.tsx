@@ -510,7 +510,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
     }
 
     setSaving(true);
-    const url = editId ? `/api/ads/${editId}` : "/api/ads";
+    const url = editId ? `/api/anuncios/${editId}` : "/api/anuncios";
     const method = editId ? "PUT" : "POST";
     const body = {
       imageUrl: form.imageUrl || null,

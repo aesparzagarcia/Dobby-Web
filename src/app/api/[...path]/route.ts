@@ -76,7 +76,9 @@ function proxyHttp(
 
 async function proxy(req: NextRequest, path: string[] | undefined): Promise<NextResponse> {
   try {
-    const segments = Array.isArray(path) ? path : [];
+    const segments = Array.isArray(path) ? [...path] : [];
+    // Admin UI uses /api/anuncios so Chrome ad blockers don't intercept /api/ads/:id.
+    if (segments[0] === "anuncios") segments[0] = "ads";
     const backend = resolveBackendUrl();
     const incoming = new URL(req.url);
     const target = `${backend}/api/${segments.join("/")}${incoming.search}`;
