@@ -546,6 +546,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
       });
       if (res.ok) {
         onSaved();
+        onClose();
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || "Error al guardar");
