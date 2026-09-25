@@ -480,8 +480,8 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!form.advertiserName.trim()) {
       alert("El nombre del anunciante es obligatorio.");
       return;
@@ -547,10 +547,12 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
       if (res.ok) {
         onSaved();
         onClose();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || "Error al guardar");
+        return;
       }
+      const data = await res.json().catch(() => ({}));
+      alert(typeof data?.error === "string" ? data.error : "Error al guardar");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo guardar");
     } finally {
       setSaving(false);
     }
@@ -584,7 +586,7 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <fieldset disabled={!canWrite} className="min-w-0 border-0 p-0 m-0">
           <div className="px-6 py-5">
@@ -728,7 +730,6 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                       <div>
                         <FieldLabel>Facebook (URL)</FieldLabel>
                         <input
-                          type="url"
                           value={form.facebookUrl}
                           onChange={(e) => setForm((f) => ({ ...f, facebookUrl: e.target.value }))}
                           placeholder="https://facebook.com/..."
@@ -738,7 +739,6 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                       <div>
                         <FieldLabel>Instagram (URL)</FieldLabel>
                         <input
-                          type="url"
                           value={form.instagramUrl}
                           onChange={(e) => setForm((f) => ({ ...f, instagramUrl: e.target.value }))}
                           placeholder="https://instagram.com/..."
@@ -748,7 +748,6 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                       <div>
                         <FieldLabel>Sitio web (URL)</FieldLabel>
                         <input
-                          type="url"
                           value={form.websiteUrl}
                           onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
                           placeholder="https://tusitio.com"
@@ -759,7 +758,6 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                     <div>
                       <FieldLabel>Correo electrónico</FieldLabel>
                       <input
-                        type="email"
                         value={form.email}
                         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                         placeholder="ejemplo@correo.com"
@@ -1110,8 +1108,9 @@ export function AdFormModal({ mode, editId, initialValues, onClose, onSaved, onD
                   </button>
                 ) : null}
                 <button
-                  type="submit"
+                  type="button"
                   disabled={saving || imageUploading || logoUploading}
+                  onClick={() => void handleSubmit()}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-dobby-600 text-white text-sm font-medium hover:bg-dobby-700 disabled:opacity-60"
                 >
                   <IconSave className="w-4 h-4" />
