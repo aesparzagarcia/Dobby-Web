@@ -50,8 +50,14 @@ type Shop = {
   opening_days?: string[] | null;
 };
 
-type SortKey = "recent" | "name" | "orders" | "revenue" | "rating";
+type DueFilter = "" | "due";
 type TypeFilter = "" | "SHOP" | "RESTAURANT" | "CAR_WASH" | "SERVICE_PROVIDER";
+type DateParts = { y: number; m: number; d: number };
+type MembershipDue = {
+  expiry: DateParts;
+  daysLeft: number;
+  kind: "ok" | "expiring" | "expired";
+};
 
 const PAGE_SIZE = 16;
 
@@ -151,6 +157,54 @@ function formatShopDate(iso?: string): string {
     month: "short",
     year: "numeric",
   }).format(d);
+}
+
+function mexicoDateParts(value: Date | string): DateParts | null {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return null;
+  const stamp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(d);
+  const [y, m, day] = stamp.split("-").map(Number);
+  if (!y || !m || !day) return null;
+  return { y, m, d: day };
+}
+
+function addOneCalendarMonth(parts: DateParts): DateParts {
+  let y = parts.y;
+  let m = parts.m + 1;
+  if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { y, m, d: Math.min(parts.d, lastDay) };
+}
+
+function formatDateParts(parts: DateParts): string {
+  const d = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, 12));
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
+}
+
+function calendarDaysBetween(from: DateParts, to: DateParts): number {
+  const a = Date.UTC(from.y, from.m - 1, from.d);
+  const b = Date.UTC(to.y, to.m - 1, to.d);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Caducidad = fecha de registro + 1 mes exacto. */
+function shopMembershipDue(shop: Shop, today = mexicoDateParts(new Date())): MembershipDue | null {
+  if (!shop.createdAt || !today) return null;
+  const registered = mexicoDateParts(shop.createdAt);
+  if (!registered) return null;
+  const expiry = addOneCalendarMonth(registered);
+  const daysLeft = calendarDaysBetween(today, expiry);
+  const kind: MembershipDue["kind"] =
+    daysLeft < 0 ? "expired" : daysLeft <= 7 ? "expiring" : "ok";
+  return { expiry, daysLeft, kind };
 }
 
 function formatHoursRange(open: string, close: string) {
@@ -253,6 +307,7 @@ function ShopCard({
   const { canWrite } = useAdminAccess();
   const membershipActive = (shop.membership ?? "ACTIVE") === "ACTIVE";
   const ops = shopOpsStatusMeta(shop.status);
+  const due = shopMembershipDue(shop);
   const hours = shopHours(shop);
   const rating =
     shop.ratingCount && shop.ratingCount > 0 && shop.rate != null
@@ -281,6 +336,15 @@ function ShopCard({
           <span className={`w-1.5 h-1.5 rounded-full ${ops.dot}`} />
           {ops.label}
         </span>
+        {due?.kind === "expired" ? (
+          <span className="absolute bottom-2 left-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white">
+            Vencida
+          </span>
+        ) : due?.kind === "expiring" ? (
+          <span className="absolute bottom-2 left-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500 text-white">
+            Por vencer{due.daysLeft === 0 ? " hoy" : ` · ${due.daysLeft}d`}
+          </span>
+        ) : null}
         <div className="absolute top-2 right-2">
           <button
             type="button"
@@ -357,6 +421,21 @@ function ShopCard({
         <p className="text-[11px] text-gray-500 mt-0.5">
           Membresía: {membershipActive ? "Activa" : "Inactiva"}
         </p>
+        {due ? (
+          <p
+            className={`text-[11px] mt-0.5 ${
+              due.kind === "expired"
+                ? "text-red-600 font-medium"
+                : due.kind === "expiring"
+                  ? "text-amber-700 font-medium"
+                  : "text-gray-500"
+            }`}
+          >
+            {due.kind === "expired"
+              ? `Vencida: ${formatDateParts(due.expiry)}`
+              : `Vence: ${formatDateParts(due.expiry)}`}
+          </p>
+        ) : null}
         {hours ? (
           <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
             {formatOpeningDays(shopOpeningDays(shop))} · {formatHoursRange(hours.open, hours.close)}
@@ -424,7 +503,7 @@ export default function ShopsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
-  const [sortBy, setSortBy] = useState<SortKey>("recent");
+  const [dueFilter, setDueFilter] = useState<DueFilter>("");
   const [page, setPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -493,10 +572,11 @@ export default function ShopsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, statusFilter, typeFilter, sortBy]);
+  }, [searchQuery, statusFilter, typeFilter, dueFilter]);
 
   const filteredShops = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const today = mexicoDateParts(new Date());
     let list = [...shops];
     if (typeFilter) {
       list = list.filter((s) => s.type === typeFilter);
@@ -512,26 +592,27 @@ export default function ShopsPage() {
           (s.email ?? "").toLowerCase().includes(q)
       );
     }
-    list.sort((a, b) => {
-      switch (sortBy) {
-        case "name":
-          return a.name.localeCompare(b.name, "es");
-        case "orders":
-          return (b.orderCount ?? 0) - (a.orderCount ?? 0);
-        case "revenue":
-          return (b.totalRevenue ?? 0) - (a.totalRevenue ?? 0);
-        case "rating":
-          return (b.rate ?? 0) - (a.rate ?? 0);
-        case "recent":
-        default: {
-          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return tb - ta;
-        }
-      }
-    });
+    if (dueFilter === "due") {
+      list = list.filter((s) => {
+        const due = shopMembershipDue(s, today ?? undefined);
+        return due?.kind === "expired" || due?.kind === "expiring";
+      });
+      list.sort((a, b) => {
+        const da = shopMembershipDue(a, today ?? undefined);
+        const db = shopMembershipDue(b, today ?? undefined);
+        const left = da?.daysLeft ?? 9999;
+        const right = db?.daysLeft ?? 9999;
+        return left - right;
+      });
+    } else {
+      list.sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+    }
     return list;
-  }, [shops, searchQuery, typeFilter, sortBy]);
+  }, [shops, searchQuery, typeFilter, dueFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredShops.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -782,15 +863,12 @@ export default function ShopsPage() {
           <option value="HIGH_DEMAND">Estado: Alta demanda</option>
         </select>
         <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          value={dueFilter}
+          onChange={(e) => setDueFilter(e.target.value as DueFilter)}
           className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[220px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
-          <option value="recent">Ordenar por: Más recientes</option>
-          <option value="name">Ordenar por: Nombre</option>
-          <option value="orders">Ordenar por: Que más vende</option>
-          <option value="revenue">Ordenar por: Mayor ingreso</option>
-          <option value="rating">Ordenar por: Mejor calificación</option>
+          <option value="">Vencimiento: Todos</option>
+          <option value="due">Vencidos/por vencer</option>
         </select>
       </div>
 
@@ -801,7 +879,9 @@ export default function ShopsPage() {
           <p className="text-gray-500">
             {shops.length === 0
               ? "Aún no hay tiendas registradas."
-              : "No hay tiendas que coincidan con tu búsqueda."}
+              : dueFilter === "due"
+                ? "No hay tiendas vencidas ni por vencer en los próximos 7 días."
+                : "No hay tiendas que coincidan con tu búsqueda."}
           </p>
           {shops.length === 0 && (
             <WriteOnly>
