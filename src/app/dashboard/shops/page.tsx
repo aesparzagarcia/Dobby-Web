@@ -62,6 +62,33 @@ const TYPE_LABELS: Record<string, string> = {
   CAR_WASH: "Autolavado",
 };
 
+function shopOpsStatusMeta(status: string | null | undefined): {
+  label: string;
+  badge: string;
+  dot: string;
+} {
+  const raw = (status ?? "AVAILABLE").toUpperCase();
+  if (raw === "SLOW" || raw === "LENTO") {
+    return {
+      label: "Lento",
+      badge: "bg-white/95 text-amber-800 ring-1 ring-amber-200/80",
+      dot: "bg-amber-400",
+    };
+  }
+  if (raw === "HIGH_DEMAND" || raw === "ALTA_DEMANDA") {
+    return {
+      label: "Alta demanda",
+      badge: "bg-white/95 text-red-700 ring-1 ring-red-200/80",
+      dot: "bg-red-500",
+    };
+  }
+  return {
+    label: "Disponible",
+    badge: "bg-white/95 text-emerald-700 ring-1 ring-emerald-200/80",
+    dot: "bg-emerald-500",
+  };
+}
+
 const WEEKDAYS: { code: string; short: string; full: string }[] = [
   { code: "MON", short: "Lun", full: "Lunes" },
   { code: "TUE", short: "Mar", full: "Martes" },
@@ -224,8 +251,8 @@ function ShopCard({
   togglingActive: boolean;
 }) {
   const { canWrite } = useAdminAccess();
-  const isActive = shop.status === "ACTIVE";
   const membershipActive = (shop.membership ?? "ACTIVE") === "ACTIVE";
+  const ops = shopOpsStatusMeta(shop.status);
   const hours = shopHours(shop);
   const rating =
     shop.ratingCount && shop.ratingCount > 0 && shop.rate != null
@@ -249,16 +276,10 @@ function ShopCard({
           </div>
         )}
         <span
-          className={`absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold backdrop-blur-sm ${
-            isActive
-              ? "bg-white/95 text-emerald-700 ring-1 ring-emerald-200/80"
-              : "bg-white/95 text-gray-600 ring-1 ring-gray-200/80"
-          }`}
+          className={`absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold backdrop-blur-sm ${ops.badge}`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-gray-400"}`}
-          />
-          {isActive ? "Activa" : "Inactiva"}
+          <span className={`w-1.5 h-1.5 rounded-full ${ops.dot}`} />
+          {ops.label}
         </span>
         <div className="absolute top-2 right-2">
           <button
@@ -377,20 +398,20 @@ function ShopCard({
         <button
           type="button"
           role="switch"
-          aria-checked={isActive}
+          aria-checked={membershipActive}
           disabled={togglingActive || !canWrite}
-          onClick={() => onToggleActive(!isActive)}
+          onClick={() => onToggleActive(!membershipActive)}
           className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-500/40 disabled:opacity-50 ${
-            isActive ? "bg-dobby-600" : "bg-gray-200"
+            membershipActive ? "bg-dobby-600" : "bg-gray-200"
           }`}
         >
           <span
             className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5 ${
-              isActive ? "translate-x-5" : "translate-x-0.5"
+              membershipActive ? "translate-x-5" : "translate-x-0.5"
             }`}
           />
         </button>
-        <span className="text-xs text-gray-600">Activa</span>
+        <span className="text-xs text-gray-600">Membresía activa</span>
       </div>
     </article>
   );
@@ -418,7 +439,7 @@ export default function ShopsPage() {
     registeredAt: mexicoTodayInput(),
     membership: "ACTIVE",
     logoUrl: "",
-    status: "ACTIVE",
+    status: "AVAILABLE",
     lat: null as number | null,
     lng: null as number | null,
     openingHour: "",
@@ -444,7 +465,7 @@ export default function ShopsPage() {
     registeredAt: mexicoTodayInput(),
     membership: "ACTIVE",
     logoUrl: "",
-    status: "ACTIVE",
+    status: "AVAILABLE",
     lat: null as number | null,
     lng: null as number | null,
     openingHour: "",
@@ -626,7 +647,10 @@ export default function ShopsPage() {
       registeredAt: isoToDateInput(shop.createdAt),
       membership: shop.membership === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       logoUrl: shop.logoUrl || "",
-      status: shop.status,
+      status:
+        shop.status === "SLOW" || shop.status === "HIGH_DEMAND" || shop.status === "AVAILABLE"
+          ? shop.status
+          : "AVAILABLE",
       lat,
       lng,
       openingHour: hours?.open ?? "",
@@ -651,20 +675,20 @@ export default function ShopsPage() {
 
   async function handleToggleActive(shop: Shop, active: boolean) {
     setTogglingId(shop.id);
-    const status = active ? "ACTIVE" : "INACTIVE";
+    const membership = active ? "ACTIVE" : "INACTIVE";
     try {
       const res = await apiFetch(`/api/shops/${shop.id}`, {
         method: "PUT",
         headers: authHeaders(),
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ membership }),
       });
       if (res.ok) {
         setShops((prev) =>
-          prev.map((s) => (s.id === shop.id ? { ...s, status } : s))
+          prev.map((s) => (s.id === shop.id ? { ...s, membership } : s))
         );
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(typeof data?.error === "string" ? data.error : "No se pudo actualizar el estado");
+        alert(typeof data?.error === "string" ? data.error : "No se pudo actualizar la membresía");
         load();
       }
     } finally {
@@ -753,8 +777,9 @@ export default function ShopsPage() {
           className="dashboard-filter-select pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm shadow-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-dobby-500/30"
         >
           <option value="">Estado: Todos</option>
-          <option value="ACTIVE">Estado: Activas</option>
-          <option value="INACTIVE">Estado: Inactivas</option>
+          <option value="AVAILABLE">Estado: Disponible</option>
+          <option value="SLOW">Estado: Lento</option>
+          <option value="HIGH_DEMAND">Estado: Alta demanda</option>
         </select>
         <select
           value={sortBy}
@@ -1093,8 +1118,9 @@ export default function ShopsPage() {
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 >
-                  <option value="ACTIVE">Activo</option>
-                  <option value="INACTIVE">Inactivo</option>
+                  <option value="AVAILABLE">Disponible</option>
+                  <option value="SLOW">Lento</option>
+                  <option value="HIGH_DEMAND">Alta demanda</option>
                 </select>
               </div>
               </fieldset>
