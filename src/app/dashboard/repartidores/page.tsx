@@ -13,9 +13,11 @@ type DeliveryMan = {
   name: string;
   profilePhotoUrl: string | null;
   address: string | null;
+  colonia: string | null;
   celphone: string | null;
   idImageFrontUrl: string | null;
   idImageBackUrl: string | null;
+  addressProofUrl: string | null;
   referenceName: string | null;
   referencePhone: string | null;
   referenceAddress: string | null;
@@ -35,11 +37,12 @@ const defaultForm = {
   name: "",
   profilePhotoUrl: "",
   address: "",
+  colonia: "",
   celphone: "",
   email: "",
-  password: "",
   idImageFrontUrl: "",
   idImageBackUrl: "",
+  addressProofUrl: "",
   referenceName: "",
   referencePhone: "",
   referenceAddress: "",
@@ -81,9 +84,11 @@ export default function DeliveryMenPage() {
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [idFrontUploading, setIdFrontUploading] = useState(false);
   const [idBackUploading, setIdBackUploading] = useState(false);
+  const [addressProofUploading, setAddressProofUploading] = useState(false);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const idFrontRef = useRef<HTMLInputElement>(null);
   const idBackRef = useRef<HTMLInputElement>(null);
+  const addressProofRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   function load() {
@@ -119,7 +124,9 @@ export default function DeliveryMenPage() {
         (d) =>
           d.name.toLowerCase().includes(q) ||
           d.user?.email?.toLowerCase().includes(q) ||
-          d.celphone?.toLowerCase().includes(q)
+          d.celphone?.toLowerCase().includes(q) ||
+          d.colonia?.toLowerCase().includes(q) ||
+          d.address?.toLowerCase().includes(q)
       );
     }
     if (statusFilter) {
@@ -146,11 +153,12 @@ export default function DeliveryMenPage() {
       name: d.name || "",
       profilePhotoUrl: d.profilePhotoUrl || "",
       address: d.address || "",
+      colonia: d.colonia || "",
       celphone: d.celphone || "",
       email: d.user?.email || "",
-      password: "",
       idImageFrontUrl: d.idImageFrontUrl || "",
       idImageBackUrl: d.idImageBackUrl || "",
+      addressProofUrl: d.addressProofUrl || "",
       referenceName: d.referenceName || "",
       referencePhone: d.referencePhone || "",
       referenceAddress: d.referenceAddress || "",
@@ -177,9 +185,11 @@ export default function DeliveryMenPage() {
           name: form.name,
           profilePhotoUrl: form.profilePhotoUrl || null,
           address: form.address || undefined,
+          colonia: form.colonia || undefined,
           celphone: form.celphone || undefined,
           idImageFrontUrl: form.idImageFrontUrl || null,
           idImageBackUrl: form.idImageBackUrl || null,
+          addressProofUrl: form.addressProofUrl || null,
           referenceName: form.referenceName || undefined,
           referencePhone: form.referencePhone || undefined,
           referenceAddress: form.referenceAddress || undefined,
@@ -197,13 +207,14 @@ export default function DeliveryMenPage() {
         headers: authHeaders(),
         body: JSON.stringify({
           email: form.email,
-          password: form.password,
           name: form.name,
           profilePhotoUrl: form.profilePhotoUrl || undefined,
           address: form.address || undefined,
+          colonia: form.colonia || undefined,
           celphone: form.celphone || undefined,
           idImageFrontUrl: form.idImageFrontUrl || undefined,
           idImageBackUrl: form.idImageBackUrl || undefined,
+          addressProofUrl: form.addressProofUrl || undefined,
           referenceName: form.referenceName || undefined,
           referencePhone: form.referencePhone || undefined,
           referenceAddress: form.referenceAddress || undefined,
@@ -246,6 +257,34 @@ export default function DeliveryMenPage() {
     } finally {
       setProfilePhotoUploading(false);
       if (profilePhotoRef.current) profilePhotoRef.current.value = "";
+    }
+  }
+
+  async function handleAddressProofUpload(file: File) {
+    if (!file?.type.startsWith("image/")) {
+      alert("Solo se permiten imágenes (JPEG, PNG, GIF, WebP).");
+      return;
+    }
+    setAddressProofUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch("/api/upload/delivery-address-proof", {
+        method: "POST",
+        headers: { ...authHeadersForUpload() },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Error al subir la imagen");
+        return;
+      }
+      setForm((f) => ({ ...f, addressProofUrl: data.url }));
+    } catch {
+      alert("Error al subir la imagen");
+    } finally {
+      setAddressProofUploading(false);
+      if (addressProofRef.current) addressProofRef.current.value = "";
     }
   }
 
@@ -618,30 +657,28 @@ export default function DeliveryMenPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm text-gray-600 mb-1">Colonia</label>
+                <input
+                  value={form.colonia}
+                  onChange={(e) => setForm((f) => ({ ...f, colonia: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
+                />
+              </div>
               {modal === "create" ? (
-                <>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Correo</label>
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Contraseña inicial</label>
-                    <input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Correo</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-dobby-500/30 outline-none"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    El acceso a la app es con celular y OTP; no se usa contraseña.
+                  </p>
+                </div>
               ) : (
                 <>
                   <div>
@@ -720,6 +757,36 @@ export default function DeliveryMenPage() {
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, idImageBackUrl: "" }))}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm text-gray-600 mb-1">Comprobante de domicilio</label>
+                <input
+                  ref={addressProofRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={(e) =>
+                    e.target.files?.[0] && handleAddressProofUpload(e.target.files[0])
+                  }
+                  disabled={addressProofUploading}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-dobby-50 file:text-dobby-700"
+                />
+                {addressProofUploading && <p className="mt-1 text-xs text-gray-500">Subiendo…</p>}
+                {form.addressProofUrl && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <img
+                      src={uploadsUrl(form.addressProofUrl)}
+                      alt="Comprobante de domicilio"
+                      className="w-20 h-14 rounded object-cover border bg-gray-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, addressProofUrl: "" }))}
                       className="text-xs text-red-600 hover:underline"
                     >
                       Quitar
