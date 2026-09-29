@@ -35,6 +35,17 @@ type EarningsResponse = {
     totalEarned: number;
     totalOrderValue: number;
   };
+  week?: {
+    week_start: string;
+    week_end: string;
+    active_hours_label: string;
+    deliveries: number;
+    weekly_bonus_pesos: number;
+    weekly_status: string;
+    weekly_level_label: string;
+    next_goal: { message: string } | null;
+    weekend: { deliveries: number; goal: number; unlocked_pesos: number; status: string };
+  };
   deliveries: DeliveryRow[];
 };
 
@@ -203,6 +214,41 @@ export default function DriverEarningsPage() {
               <p className="text-xs text-gray-500 mt-1">Total cobrado a clientes</p>
             </div>
           </div>
+
+          {data.week ? (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-8">
+              <h2 className="font-semibold text-gray-900">Esta semana</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {data.week.week_start} → {data.week.week_end} · {data.week.weekly_level_label}
+              </p>
+              <div className="mt-3 grid sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-400 text-xs uppercase">Horas activas</p>
+                  <p className="font-semibold text-gray-900">{data.week.active_hours_label}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs uppercase">Pedidos</p>
+                  <p className="font-semibold text-gray-900">{data.week.deliveries}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs uppercase">Bono semanal</p>
+                  <p className="font-semibold text-gray-900">
+                    ${data.week.weekly_bonus_pesos} · {data.week.weekly_status}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs uppercase">Reto fin de semana</p>
+                  <p className="font-semibold text-gray-900">
+                    {data.week.weekend.deliveries}/{data.week.weekend.goal} · $
+                    {data.week.weekend.unlocked_pesos}
+                  </p>
+                </div>
+              </div>
+              {data.week.next_goal ? (
+                <p className="text-sm text-dobby-700 mt-3">{data.week.next_goal.message}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">

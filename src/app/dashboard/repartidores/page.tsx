@@ -291,6 +291,20 @@ export default function DeliveryMenPage() {
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
             Lista de personal de reparto. Haz clic en una tarjeta para editar. El estado se puede cambiar al editar.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/repartidores/cobertura"
+              className="text-sm font-medium text-dobby-600 hover:text-dobby-700 px-3 py-1.5 rounded-lg hover:bg-dobby-50 border border-dobby-100"
+            >
+              Cobertura de horarios
+            </Link>
+            <Link
+              href="/dashboard/repartidores/incentivos"
+              className="text-sm font-medium text-dobby-600 hover:text-dobby-700 px-3 py-1.5 rounded-lg hover:bg-dobby-50 border border-dobby-100"
+            >
+              Bonos e incentivos
+            </Link>
+          </div>
         </div>
         <WriteOnly>
           <button
