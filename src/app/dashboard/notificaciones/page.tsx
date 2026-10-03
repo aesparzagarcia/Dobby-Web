@@ -33,6 +33,8 @@ type NotificationRow = {
   openingHour: string | null;
   closingHour: string | null;
   openingDays?: string[];
+  openingSchedules?: { days: string[]; open: string; close: string }[];
+  opening_schedules?: { days: string[]; open: string; close: string }[];
   email: string;
   vehicleType: string | null;
   status: "PENDING" | "REVIEWED" | "DISMISSED" | "ACCEPTED";
@@ -56,6 +58,49 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   SERVICE_PROVIDER: "Proveedor de servicios",
   CAR_WASH: "Autolavado",
 };
+
+const WEEKDAY_SHORT: Record<string, string> = {
+  MON: "Lun",
+  TUE: "Mar",
+  WED: "Mié",
+  THU: "Jue",
+  FRI: "Vie",
+  SAT: "Sáb",
+  SUN: "Dom",
+};
+
+function formatOpeningDays(days: string[]): string {
+  const selected = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].filter((d) =>
+    days.includes(d)
+  );
+  if (selected.length === 7) return "Todos los días";
+  if (
+    selected.length === 5 &&
+    selected.every((d) => d !== "SAT" && d !== "SUN")
+  ) {
+    return "Lun–Vie";
+  }
+  return selected.map((d) => WEEKDAY_SHORT[d] ?? d).join(", ");
+}
+
+function notificationHourLines(item: NotificationRow): string[] {
+  const raw = item.openingSchedules ?? item.opening_schedules ?? [];
+  const windows = raw.filter((w) => w.open && w.close && w.days?.length);
+  if (windows.length > 0) {
+    return windows.map(
+      (w) => `${formatOpeningDays(w.days)} · ${w.open} – ${w.close}`
+    );
+  }
+  const range = [item.openingHour, item.closingHour].filter(Boolean).join(" – ");
+  const days =
+    item.openingDays && item.openingDays.length > 0
+      ? formatOpeningDays(item.openingDays)
+      : "";
+  if (range && days) return [`${days} · ${range}`];
+  if (range) return [range];
+  if (days) return [days];
+  return [];
+}
 
 const STATUS_LABELS: Record<NotificationRow["status"], string> = {
   PENDING: "Pendiente",
@@ -384,32 +429,13 @@ export default function NotificacionesPage() {
                         />
                       )}
                       {item.address && <Detail label="Dirección" value={item.address} />}
-                      {(item.openingHour || item.closingHour) && (
+                      {notificationHourLines(item).map((line, i) => (
                         <Detail
-                          label="Horario"
-                          value={[item.openingHour, item.closingHour]
-                            .filter(Boolean)
-                            .join(" – ")}
+                          key={`${item.id}-hours-${i}`}
+                          label={i === 0 ? "Horario" : "Horario extra"}
+                          value={line}
                         />
-                      )}
-                      {item.openingDays && item.openingDays.length > 0 && (
-                        <Detail
-                          label="Días"
-                          value={item.openingDays
-                            .map((d) =>
-                              ({
-                                MON: "Lun",
-                                TUE: "Mar",
-                                WED: "Mié",
-                                THU: "Jue",
-                                FRI: "Vie",
-                                SAT: "Sáb",
-                                SUN: "Dom",
-                              }[d] ?? d)
-                            )
-                            .join(", ")}
-                        />
-                      )}
+                      ))}
                       {item.vehicleType && (
                         <Detail label="Vehículo" value={item.vehicleType} />
                       )}
