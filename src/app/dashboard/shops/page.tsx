@@ -23,6 +23,12 @@ const ShopLocationPickerMap = dynamic(
   }
 );
 
+type ShopHourWindow = {
+  days: string[];
+  open: string;
+  close: string;
+};
+
 type Shop = {
   id: string;
   name: string;
@@ -48,6 +54,8 @@ type Shop = {
   closing_hour?: string | null;
   openingDays?: string[] | null;
   opening_days?: string[] | null;
+  openingSchedules?: ShopHourWindow[] | null;
+  opening_schedules?: ShopHourWindow[] | null;
 };
 
 type DueFilter = "" | "due";
@@ -130,6 +138,89 @@ function shopHours(shop: Shop): { open: string; close: string } | null {
   const close = shop.closingHour ?? shop.closing_hour ?? null;
   if (!open || !close) return null;
   return { open, close };
+}
+
+type HourWindowForm = {
+  days: string[];
+  openingHour: string;
+  closingHour: string;
+};
+
+const MAX_HOUR_WINDOWS = 3;
+
+const emptyHourWindow = (days: string[] = [...ALL_WEEKDAYS]): HourWindowForm => ({
+  days,
+  openingHour: "",
+  closingHour: "",
+});
+
+function shopHourWindows(shop: Shop): ShopHourWindow[] {
+  const raw = shop.openingSchedules ?? shop.opening_schedules ?? [];
+  const fromJson = raw
+    .map((w) => ({
+      days: (w.days ?? []).filter((d) => ALL_WEEKDAYS.includes(d)),
+      open: (w.open ?? "").trim(),
+      close: (w.close ?? "").trim(),
+    }))
+    .filter((w) => w.days.length > 0 && w.open && w.close);
+  if (fromJson.length > 0) return fromJson;
+  const hours = shopHours(shop);
+  if (!hours) return [];
+  return [{ days: shopOpeningDays(shop), open: hours.open, close: hours.close }];
+}
+
+function windowsToForm(windows: ShopHourWindow[]): HourWindowForm[] {
+  if (windows.length === 0) return [emptyHourWindow()];
+  return windows.map((w) => ({
+    days: w.days.length > 0 ? w.days : [...ALL_WEEKDAYS],
+    openingHour: w.open,
+    closingHour: w.close,
+  }));
+}
+
+function addHourWindow(schedules: HourWindowForm[]): HourWindowForm[] {
+  if (schedules.length >= MAX_HOUR_WINDOWS) return schedules;
+  const used = new Set(schedules.flatMap((s) => s.days));
+  const unused = ALL_WEEKDAYS.filter((d) => !used.has(d));
+  if (unused.length > 0) {
+    return [...schedules, emptyHourWindow(unused)];
+  }
+  const stealOrder = ["SAT", "SUN", "FRI", "MON", "TUE", "WED", "THU"];
+  const steal = stealOrder.find((code) =>
+    schedules.some((s) => s.days.includes(code) && s.days.length > 1)
+  );
+  if (!steal) return schedules;
+  return [
+    ...schedules.map((s) =>
+      s.days.includes(steal) && s.days.length > 1
+        ? { ...s, days: s.days.filter((d) => d !== steal) }
+        : s
+    ),
+    emptyHourWindow([steal]),
+  ];
+}
+
+function toggleScheduleDay(
+  schedules: HourWindowForm[],
+  index: number,
+  code: string
+): HourWindowForm[] {
+  const current = schedules[index];
+  if (!current) return schedules;
+  const selected = current.days.includes(code);
+  if (selected) {
+    if (current.days.length === 1) return schedules;
+    return schedules.map((s, i) =>
+      i === index ? { ...s, days: s.days.filter((d) => d !== code) } : s
+    );
+  }
+  const owner = schedules.findIndex((s, i) => i !== index && s.days.includes(code));
+  if (owner >= 0 && schedules[owner].days.length === 1) return schedules;
+  return schedules.map((s, i) => {
+    if (i === index) return { ...s, days: [...s.days, code] };
+    if (s.days.includes(code)) return { ...s, days: s.days.filter((d) => d !== code) };
+    return s;
+  });
 }
 
 function shopSecondaryPhone(shop: Shop): string {
@@ -308,7 +399,7 @@ function ShopCard({
   const membershipActive = (shop.membership ?? "ACTIVE") === "ACTIVE";
   const ops = shopOpsStatusMeta(shop.status);
   const due = shopMembershipDue(shop);
-  const hours = shopHours(shop);
+  const hours = shopHourWindows(shop);
   const rating =
     shop.ratingCount && shop.ratingCount > 0 && shop.rate != null
       ? shop.rate.toFixed(1)
@@ -436,10 +527,14 @@ function ShopCard({
               : `Vence: ${formatDateParts(due.expiry)}`}
           </p>
         ) : null}
-        {hours ? (
-          <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
-            {formatOpeningDays(shopOpeningDays(shop))} · {formatHoursRange(hours.open, hours.close)}
-          </p>
+        {hours.length > 0 ? (
+          <div className="mt-0.5 space-y-0.5">
+            {hours.map((w, i) => (
+              <p key={`${w.open}-${w.close}-${i}`} className="text-[11px] text-gray-500 tabular-nums">
+                {formatOpeningDays(w.days)} · {formatHoursRange(w.open, w.close)}
+              </p>
+            ))}
+          </div>
         ) : null}
       </div>
 
@@ -521,9 +616,7 @@ export default function ShopsPage() {
     status: "AVAILABLE",
     lat: null as number | null,
     lng: null as number | null,
-    openingHour: "",
-    closingHour: "",
-    openingDays: [...ALL_WEEKDAYS],
+    schedules: [emptyHourWindow()] as HourWindowForm[],
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
@@ -547,9 +640,7 @@ export default function ShopsPage() {
     status: "AVAILABLE",
     lat: null as number | null,
     lng: null as number | null,
-    openingHour: "",
-    closingHour: "",
-    openingDays: [...ALL_WEEKDAYS],
+    schedules: [emptyHourWindow()],
   });
 
   function load() {
@@ -648,13 +739,16 @@ export default function ShopsPage() {
       alert("Indica la fecha de registro.");
       return;
     }
-    if (!form.openingHour.trim() || !form.closingHour.trim()) {
-      alert("Indica hora de apertura y hora de cierre.");
-      return;
-    }
-    if (form.openingDays.length === 0) {
-      alert("Selecciona al menos un día de apertura.");
-      return;
+    for (let i = 0; i < form.schedules.length; i++) {
+      const w = form.schedules[i];
+      if (!w.openingHour.trim() || !w.closingHour.trim()) {
+        alert(`Indica hora de apertura y cierre en el horario ${i + 1}.`);
+        return;
+      }
+      if (w.days.length === 0) {
+        alert(`Selecciona al menos un día en el horario ${i + 1}.`);
+        return;
+      }
     }
     setLocationError(null);
     setSaving(true);
@@ -674,9 +768,11 @@ export default function ShopsPage() {
         status: form.status,
         lat: form.lat,
         lng: form.lng,
-        opening_hour: form.openingHour.trim() || null,
-        closing_hour: form.closingHour.trim() || null,
-        opening_days: form.openingDays,
+        opening_schedules: form.schedules.map((w) => ({
+          days: w.days,
+          open: w.openingHour.trim(),
+          close: w.closingHour.trim(),
+        })),
       };
       const res = await apiFetch(url, {
         method,
@@ -712,7 +808,6 @@ export default function ShopsPage() {
   }
 
   function openEdit(shop: Shop) {
-    const hours = shopHours(shop);
     const lat =
       shop.lat != null && Number.isFinite(Number(shop.lat)) ? Number(shop.lat) : null;
     const lng =
@@ -734,9 +829,7 @@ export default function ShopsPage() {
           : "AVAILABLE",
       lat,
       lng,
-      openingHour: hours?.open ?? "",
-      closingHour: hours?.close ?? "",
-      openingDays: shopOpeningDays(shop),
+      schedules: windowsToForm(shopHourWindows(shop)),
     });
     const pinned = hasValidShopLocation(lat, lng);
     setLocationFromMap(pinned);
@@ -1096,69 +1189,127 @@ export default function ShopsPage() {
                   <option value="INACTIVE">Inactiva</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Días de apertura</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {WEEKDAYS.map((day) => {
-                    const selected = form.openingDays.includes(day.code);
-                    return (
-                      <button
-                        key={day.code}
-                        type="button"
-                        title={day.full}
-                        onClick={() =>
-                          setForm((f) => ({
-                            ...f,
-                            openingDays: selected
-                              ? f.openingDays.filter((d) => d !== day.code)
-                              : [...f.openingDays, day.code],
-                          }))
-                        }
-                        className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                          selected
-                            ? "bg-dobby-600 text-white border-dobby-600"
-                            : "bg-white text-gray-600 border-gray-200 hover:border-dobby-300"
-                        }`}
-                      >
-                        {day.short}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {form.openingDays.length === 0
-                    ? "Selecciona al menos un día"
-                    : formatOpeningDays(form.openingDays)}
+              <div className="space-y-3">
+                {form.schedules.map((window, index) => (
+                  <div
+                    key={index}
+                    className="rounded-lg border border-gray-200 bg-gray-50/70 p-3 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-sm text-gray-600">
+                        {form.schedules.length === 1
+                          ? "Horario de atención"
+                          : `Horario ${index + 1}`}
+                      </label>
+                      {form.schedules.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              schedules: f.schedules.filter((_, i) => i !== index),
+                            }))
+                          }
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Quitar
+                        </button>
+                      ) : null}
+                    </div>
+                    <div>
+                      <p className="block text-xs text-gray-500 mb-1">Días</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {WEEKDAYS.map((day) => {
+                          const selected = window.days.includes(day.code);
+                          const ownedElsewhere = form.schedules.some(
+                            (s, i) => i !== index && s.days.includes(day.code) && s.days.length === 1
+                          );
+                          const disabled = ownedElsewhere && !selected;
+                          return (
+                            <button
+                              key={day.code}
+                              type="button"
+                              title={
+                                disabled
+                                  ? `${day.full} ya está en otro horario`
+                                  : day.full
+                              }
+                              disabled={disabled}
+                              onClick={() =>
+                                setForm((f) => ({
+                                  ...f,
+                                  schedules: toggleScheduleDay(f.schedules, index, day.code),
+                                }))
+                              }
+                              className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                selected
+                                  ? "bg-dobby-600 text-white border-dobby-600"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-dobby-300"
+                              }`}
+                            >
+                              {day.short}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {window.days.length === 0
+                          ? "Selecciona al menos un día"
+                          : formatOpeningDays(window.days)}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Apertura</label>
+                        <input
+                          type="time"
+                          value={window.openingHour}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              schedules: f.schedules.map((s, i) =>
+                                i === index ? { ...s, openingHour: e.target.value } : s
+                              ),
+                            }))
+                          }
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Cierre</label>
+                        <input
+                          type="time"
+                          value={window.closingHour}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              schedules: f.schedules.map((s, i) =>
+                                i === index ? { ...s, closingHour: e.target.value } : s
+                              ),
+                            }))
+                          }
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {form.schedules.length < MAX_HOUR_WINDOWS ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({ ...f, schedules: addHourWindow(f.schedules) }))
+                    }
+                    className="text-sm font-medium text-dobby-700 hover:text-dobby-800"
+                  >
+                    + Agregar otro horario
+                  </button>
+                ) : null}
+                <p className="text-xs text-gray-500">
+                  Úsalo si el negocio abre distinto el sábado o el domingo, por ejemplo lun–vie 9:00–18:00 y sáb 9:00–14:00.
                 </p>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Horario de atención</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Apertura</label>
-                    <input
-                      type="time"
-                      value={form.openingHour}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, openingHour: e.target.value }))
-                      }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Cierre</label>
-                    <input
-                      type="time"
-                      value={form.closingHour}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, closingHour: e.target.value }))
-                      }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      required
-                    />
-                  </div>
-                </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Logo de la tienda</label>
