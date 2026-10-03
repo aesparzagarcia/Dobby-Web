@@ -96,3 +96,23 @@ export function isInsideServiceArea(lat: number, lng: number): boolean {
   if (!cachedRing || cachedRing.length < 3) return true;
   return pointInPolygon(lat, lng, cachedRing);
 }
+
+export function getServiceAreaBounds(): {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+} | null {
+  if (!cachedRing || cachedRing.length < 3) return null;
+  let south = 90;
+  let north = -90;
+  let west = 180;
+  let east = -180;
+  for (const p of cachedRing) {
+    south = Math.min(south, p.lat);
+    north = Math.max(north, p.lat);
+    west = Math.min(west, p.lng);
+    east = Math.max(east, p.lng);
+  }
+  return { south, west, north, east };
+}

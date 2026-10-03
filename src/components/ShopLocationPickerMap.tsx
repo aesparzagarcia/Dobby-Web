@@ -1,17 +1,22 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 
 import { isUsableWgs84Point } from "@/lib/geo";
 import {
+  detailsGooglePlace,
+  forwardGeocodeGoogle,
   getGoogleMapsBrowserKey,
   loadGoogleMapsScript,
   onGoogleMapsAuthFailure,
   reverseGeocodeGoogle,
+  suggestGooglePlaces,
+  type PlaceSuggestion,
 } from "@/lib/googleMaps";
 import {
+  getServiceAreaBounds,
   hasValidServiceAreaPolygon,
   isInsideServiceArea,
   loadServiceAreaRing,
@@ -89,6 +94,47 @@ async function reverseGeocodeNominatim(lat: number, lng: number): Promise<string
     return null;
   } catch {
     return null;
+  }
+}
+
+async function searchNominatim(query: string): Promise<PlaceSuggestion[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+  const bounds = getServiceAreaBounds();
+  const viewbox = bounds
+    ? `&viewbox=${encodeURIComponent(`${bounds.west},${bounds.north},${bounds.east},${bounds.south}`)}&bounded=0`
+    : "";
+  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=mx&accept-language=es&q=${encodeURIComponent(q)}${viewbox}`;
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as Array<{
+      lat?: string;
+      lon?: string;
+      display_name?: string;
+      address?: NominatimAddress;
+    }>;
+    const hits: PlaceSuggestion[] = [];
+    for (const row of data) {
+      const lat = Number(row.lat);
+      const lng = Number(row.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const fromParts = row.address ? formatShortAddress(row.address) : "";
+      const label =
+        fromParts ||
+        (row.display_name ? fallbackShortFromDisplayName(row.display_name) : q);
+      hits.push({
+        placeId: null,
+        label,
+        secondary: row.display_name?.trim() || "",
+        lat,
+        lng,
+        address: label,
+      });
+    }
+    return hits;
+  } catch {
+    return [];
   }
 }
 
@@ -215,16 +261,37 @@ function MapLayoutFix() {
   return null;
 }
 
+function MapPanBridge({
+  panToRef,
+}: {
+  panToRef: MutableRefObject<((lat: number, lng: number) => void) | null>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    panToRef.current = (lat, lng) => {
+      map.setView([lat, lng], Math.max(map.getZoom(), 17), { animate: true });
+    };
+    return () => {
+      panToRef.current = null;
+    };
+  }, [map, panToRef]);
+
+  return null;
+}
+
 type ShopLocationMapCanvasProps = {
   initialCenter: L.LatLngTuple;
   onCenterIdle: (lat: number, lng: number) => void;
   onCenterFlush: (lat: number, lng: number) => void;
+  panToRef: MutableRefObject<((lat: number, lng: number) => void) | null>;
 };
 
 function ShopLocationGoogleMapCanvas({
   initialCenter,
   onCenterIdle,
   onCenterFlush,
+  panToRef,
 }: ShopLocationMapCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -274,6 +341,11 @@ function ShopLocationGoogleMapCanvas({
           keyboardShortcuts: false,
         });
         mapRef.current = map;
+        panToRef.current = (lat, lng) => {
+          map.panTo({ lat, lng });
+          const zoom = map.getZoom() ?? GOOGLE_MAP_DEFAULT_ZOOM;
+          if (zoom < GOOGLE_MAP_DEFAULT_ZOOM) map.setZoom(GOOGLE_MAP_DEFAULT_ZOOM);
+        };
 
         const readCenter = () => {
           const c = map.getCenter();
@@ -324,6 +396,7 @@ function ShopLocationGoogleMapCanvas({
       window.clearTimeout(t2);
       listeners.forEach((l) => l.remove());
       resizeObserver?.disconnect();
+      if (panToRef.current) panToRef.current = null;
       mapRef.current = null;
       if (hostRef.current) hostRef.current.innerHTML = "";
     };
@@ -336,6 +409,7 @@ const ShopLocationLeafletMapCanvas = memo(function ShopLocationLeafletMapCanvas(
   initialCenter,
   onCenterIdle,
   onCenterFlush,
+  panToRef,
 }: ShopLocationMapCanvasProps) {
   return (
     <MapContainer
@@ -351,6 +425,7 @@ const ShopLocationLeafletMapCanvas = memo(function ShopLocationLeafletMapCanvas(
         subdomains="abcd"
       />
       <MapLayoutFix />
+      <MapPanBridge panToRef={panToRef} />
       <MapCenterTracker onCenterIdle={onCenterIdle} onCenterFlush={onCenterFlush} />
     </MapContainer>
   );
@@ -447,6 +522,17 @@ export function ShopLocationPickerMap({
 
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeRequestIdRef = useRef(0);
+  const panToRef = useRef<((lat: number, lng: number) => void) | null>(null);
+  const placesAttrRef = useRef<HTMLDivElement | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
+  const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestRequestIdRef = useRef(0);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const queueReverseGeocode = useCallback((nextLat: number, nextLng: number, flush: boolean) => {
     const run = async () => {
@@ -479,6 +565,129 @@ export function ShopLocationPickerMap({
     }
   }, []);
 
+  const applyHit = useCallback(
+    (lat: number, lng: number, address: string) => {
+      geocodeRequestIdRef.current += 1;
+      if (reverseTimerRef.current) {
+        clearTimeout(reverseTimerRef.current);
+        reverseTimerRef.current = null;
+      }
+      setGeocoding(false);
+      updateCenter(lat, lng);
+      if (address) setAddressText(address);
+      panToRef.current?.(lat, lng);
+    },
+    [updateCenter]
+  );
+
+  const geoBias = useCallback(() => {
+    const c = latestCenterRef.current ?? {
+      lat: fallbackCenter[0],
+      lng: fallbackCenter[1],
+    };
+    return { lat: c.lat, lng: c.lng, bounds: getServiceAreaBounds() };
+  }, [fallbackCenter]);
+
+  const loadSuggestions = useCallback(
+    async (raw: string) => {
+      const q = raw.trim();
+      const requestId = ++suggestRequestIdRef.current;
+      if (q.length < 3) {
+        setSuggestions([]);
+        return;
+      }
+      const key = getGoogleMapsBrowserKey();
+      let hits: PlaceSuggestion[] = [];
+      if (key && window.google?.maps?.places?.AutocompleteService) {
+        hits = await suggestGooglePlaces(q, geoBias());
+      }
+      if (requestId !== suggestRequestIdRef.current) return;
+      if (hits.length === 0) {
+        hits = await searchNominatim(q);
+      }
+      if (requestId !== suggestRequestIdRef.current) return;
+      setSuggestions(hits);
+      setSearchOpen(hits.length > 0);
+    },
+    [geoBias]
+  );
+
+  const resolveSuggestion = useCallback(
+    async (hit: PlaceSuggestion): Promise<{ lat: number; lng: number; address: string } | null> => {
+      if (hit.lat != null && hit.lng != null) {
+        return {
+          lat: hit.lat,
+          lng: hit.lng,
+          address: hit.address || hit.label,
+        };
+      }
+      if (hit.placeId && placesAttrRef.current) {
+        const details = await detailsGooglePlace(hit.placeId, placesAttrRef.current);
+        if (details) {
+          return { lat: details.lat, lng: details.lng, address: details.address || hit.label };
+        }
+      }
+      const geo = await forwardGeocodeGoogle(hit.label, geoBias());
+      if (geo) return { lat: geo.lat, lng: geo.lng, address: geo.address || hit.label };
+      const nom = await searchNominatim(hit.label);
+      const first = nom[0];
+      if (first?.lat != null && first.lng != null) {
+        return { lat: first.lat, lng: first.lng, address: first.address || first.label };
+      }
+      return null;
+    },
+    [geoBias]
+  );
+
+  const goToQuery = useCallback(
+    async (raw: string, preferred?: PlaceSuggestion) => {
+      const q = raw.trim();
+      if (q.length < 3) {
+        setSearchError("Escribe al menos 3 caracteres para buscar.");
+        return;
+      }
+      setSearching(true);
+      setSearchError(null);
+      try {
+        let found: { lat: number; lng: number; address: string } | null = null;
+        if (preferred) {
+          found = await resolveSuggestion(preferred);
+        }
+        if (!found) {
+          const geo = await forwardGeocodeGoogle(q, geoBias());
+          if (geo) found = { lat: geo.lat, lng: geo.lng, address: geo.address };
+        }
+        if (!found) {
+          const nom = await searchNominatim(q);
+          const first = nom[0];
+          if (first?.lat != null && first.lng != null) {
+            found = { lat: first.lat, lng: first.lng, address: first.address || first.label };
+          }
+        }
+        if (!found) {
+          setSearchError("No se encontró esa dirección. Prueba con calle, colonia y Tala.");
+          return;
+        }
+        applyHit(found.lat, found.lng, found.address);
+        setSearchOpen(false);
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [applyHit, geoBias, resolveSuggestion]
+  );
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!searchBoxRef.current?.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
   const onCenterIdle = useCallback(
     (nextLat: number, nextLng: number) => {
       updateCenter(nextLat, nextLng);
@@ -498,15 +707,78 @@ export function ShopLocationPickerMap({
   useEffect(() => {
     return () => {
       if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+      if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     };
   }, []);
 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-gray-600">
-        Desplaza el mapa; el pin indica la ubicación. La dirección se actualiza según el centro del mapa.
-        Usa +/− para acercar o alejar.
+        Busca la dirección o desplaza el mapa; el pin indica la ubicación. Puedes editar el texto
+        antes de aplicar. Usa +/− para acercar o alejar.
       </p>
+      <div ref={searchBoxRef} className="relative">
+        <label className="block text-sm text-gray-600 mb-1">Buscar dirección</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearchQuery(next);
+              setSearchError(null);
+              if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+              suggestTimerRef.current = setTimeout(() => {
+                void loadSuggestions(next);
+              }, 280);
+            }}
+            onFocus={() => {
+              if (suggestions.length > 0) setSearchOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void goToQuery(searchQuery, suggestions[0]);
+              }
+              if (e.key === "Escape") setSearchOpen(false);
+            }}
+            placeholder="Ej. Nicolás Bravo, San Javier, Tala"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => void goToQuery(searchQuery, suggestions[0])}
+            disabled={searching}
+            className="shrink-0 rounded-lg bg-dobby-600 px-3 py-2 text-sm font-medium text-white hover:bg-dobby-700 disabled:opacity-50"
+          >
+            {searching ? "…" : "Buscar"}
+          </button>
+        </div>
+        {searchOpen && suggestions.length > 0 ? (
+          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            {suggestions.map((hit, i) => (
+              <li key={`${hit.placeId ?? hit.label}-${i}`}>
+                <button
+                  type="button"
+                  className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-dobby-50"
+                  onClick={() => {
+                    setSearchQuery(hit.label);
+                    void goToQuery(hit.label, hit);
+                  }}
+                >
+                  <span className="text-sm text-gray-900">{hit.label}</span>
+                  {hit.secondary ? (
+                    <span className="text-xs text-gray-500">{hit.secondary}</span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {searchError ? <p className="mt-1 text-xs text-red-600">{searchError}</p> : null}
+      </div>
+      <div ref={placesAttrRef} className="hidden" aria-hidden />
       <div
         className="relative h-[280px] w-full rounded-lg overflow-hidden border border-gray-200 z-0 touch-none"
         onWheelCapture={(e) => e.stopPropagation()}
@@ -515,6 +787,7 @@ export function ShopLocationPickerMap({
           initialCenter={initialMapCenterRef.current}
           onCenterIdle={onCenterIdle}
           onCenterFlush={onCenterFlush}
+          panToRef={panToRef}
         />
         <CenterPinOverlay />
       </div>

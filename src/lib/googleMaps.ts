@@ -80,7 +80,7 @@ export function loadGoogleMapsScript(apiKey: string): Promise<void> {
     script.id = "google-maps-js";
     script.async = true;
     script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=es&region=MX&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=es&region=MX&v=weekly&libraries=places`;
     script.onload = () => resolve();
     script.onerror = () => {
       mapsLoader = null;
@@ -148,5 +148,150 @@ export async function reverseGeocodeGoogle(lat: number, lng: number): Promise<st
       const name = formatGoogleShortAddress(results[0]);
       resolve(name.length > 0 ? name : null);
     });
+  });
+}
+
+export type PlaceSearchHit = {
+  lat: number;
+  lng: number;
+  address: string;
+  label: string;
+};
+
+export type PlaceSuggestion = {
+  placeId: string | null;
+  label: string;
+  secondary: string;
+  lat?: number;
+  lng?: number;
+  address?: string;
+};
+
+type GeoBias = {
+  lat: number;
+  lng: number;
+  bounds?: { south: number; west: number; north: number; east: number } | null;
+};
+
+function googleLocationBias(bias?: GeoBias): google.maps.GeocoderRequest {
+  const req: google.maps.GeocoderRequest = {
+    componentRestrictions: { country: "MX" },
+    region: "mx",
+    language: "es",
+  };
+  if (bias?.bounds) {
+    req.bounds = bias.bounds;
+  }
+  return req;
+}
+
+export async function suggestGooglePlaces(
+  query: string,
+  bias?: GeoBias
+): Promise<PlaceSuggestion[]> {
+  const q = query.trim();
+  if (!q || !window.google?.maps?.places?.AutocompleteService) return [];
+  const location = bias
+    ? new google.maps.LatLng(bias.lat, bias.lng)
+    : undefined;
+  const bounds = bias?.bounds
+    ? new google.maps.LatLngBounds(
+        { lat: bias.bounds.south, lng: bias.bounds.west },
+        { lat: bias.bounds.north, lng: bias.bounds.east }
+      )
+    : undefined;
+  return new Promise((resolve) => {
+    const svc = new google.maps.places.AutocompleteService();
+    svc.getPlacePredictions(
+      {
+        input: q,
+        componentRestrictions: { country: "mx" },
+        language: "es",
+        ...(location ? { location, radius: 15_000 } : {}),
+        ...(bounds ? { bounds } : {}),
+      },
+      (predictions, status) => {
+        if (
+          status !== google.maps.places.PlacesServiceStatus.OK ||
+          !predictions?.length
+        ) {
+          resolve([]);
+          return;
+        }
+        resolve(
+          predictions.slice(0, 6).map((p) => ({
+            placeId: p.place_id ?? null,
+            label: p.structured_formatting?.main_text || p.description,
+            secondary: p.structured_formatting?.secondary_text || "",
+          }))
+        );
+      }
+    );
+  });
+}
+
+export async function detailsGooglePlace(
+  placeId: string,
+  attrContainer: HTMLDivElement
+): Promise<PlaceSearchHit | null> {
+  if (!window.google?.maps?.places?.PlacesService) return null;
+  return new Promise((resolve) => {
+    const svc = new google.maps.places.PlacesService(attrContainer);
+    svc.getDetails(
+      {
+        placeId,
+        fields: ["geometry", "address_components", "formatted_address", "name"],
+        language: "es",
+      },
+      (place, status) => {
+        const loc = place?.geometry?.location;
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !loc) {
+          resolve(null);
+          return;
+        }
+        const address =
+          (place ? formatGoogleShortAddress(place) : "") ||
+          place?.formatted_address?.trim() ||
+          place?.name?.trim() ||
+          "";
+        resolve({
+          lat: loc.lat(),
+          lng: loc.lng(),
+          address,
+          label: address || place?.name || "",
+        });
+      }
+    );
+  });
+}
+
+export async function forwardGeocodeGoogle(
+  query: string,
+  bias?: GeoBias
+): Promise<PlaceSearchHit | null> {
+  const q = query.trim();
+  if (!q || !window.google?.maps?.Geocoder) return null;
+  return new Promise((resolve) => {
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode(
+      {
+        address: q,
+        ...googleLocationBias(bias),
+      },
+      (results, status) => {
+        if (status !== "OK" || !results?.[0]?.geometry?.location) {
+          resolve(null);
+          return;
+        }
+        const loc = results[0].geometry.location;
+        const address = formatGoogleShortAddress(results[0]);
+        resolve({
+          lat: loc.lat(),
+          lng: loc.lng(),
+          address: address || results[0].formatted_address || q,
+          label: address || results[0].formatted_address || q,
+        });
+      }
+    );
   });
 }

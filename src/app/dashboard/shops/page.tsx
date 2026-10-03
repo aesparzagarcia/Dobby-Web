@@ -180,24 +180,9 @@ function windowsToForm(windows: ShopHourWindow[]): HourWindowForm[] {
 
 function addHourWindow(schedules: HourWindowForm[]): HourWindowForm[] {
   if (schedules.length >= MAX_HOUR_WINDOWS) return schedules;
-  const used = new Set(schedules.flatMap((s) => s.days));
-  const unused = ALL_WEEKDAYS.filter((d) => !used.has(d));
-  if (unused.length > 0) {
-    return [...schedules, emptyHourWindow(unused)];
-  }
-  const stealOrder = ["SAT", "SUN", "FRI", "MON", "TUE", "WED", "THU"];
-  const steal = stealOrder.find((code) =>
-    schedules.some((s) => s.days.includes(code) && s.days.length > 1)
-  );
-  if (!steal) return schedules;
-  return [
-    ...schedules.map((s) =>
-      s.days.includes(steal) && s.days.length > 1
-        ? { ...s, days: s.days.filter((d) => d !== steal) }
-        : s
-    ),
-    emptyHourWindow([steal]),
-  ];
+  const last = schedules[schedules.length - 1];
+  const days = last?.days.length ? [...last.days] : [...ALL_WEEKDAYS];
+  return [...schedules, emptyHourWindow(days)];
 }
 
 function toggleScheduleDay(
@@ -214,13 +199,9 @@ function toggleScheduleDay(
       i === index ? { ...s, days: s.days.filter((d) => d !== code) } : s
     );
   }
-  const owner = schedules.findIndex((s, i) => i !== index && s.days.includes(code));
-  if (owner >= 0 && schedules[owner].days.length === 1) return schedules;
-  return schedules.map((s, i) => {
-    if (i === index) return { ...s, days: [...s.days, code] };
-    if (s.days.includes(code)) return { ...s, days: s.days.filter((d) => d !== code) };
-    return s;
-  });
+  return schedules.map((s, i) =>
+    i === index ? { ...s, days: [...s.days, code] } : s
+  );
 }
 
 function shopSecondaryPhone(shop: Shop): string {
@@ -1221,27 +1202,18 @@ export default function ShopsPage() {
                       <div className="flex flex-wrap gap-1.5">
                         {WEEKDAYS.map((day) => {
                           const selected = window.days.includes(day.code);
-                          const ownedElsewhere = form.schedules.some(
-                            (s, i) => i !== index && s.days.includes(day.code) && s.days.length === 1
-                          );
-                          const disabled = ownedElsewhere && !selected;
                           return (
                             <button
                               key={day.code}
                               type="button"
-                              title={
-                                disabled
-                                  ? `${day.full} ya está en otro horario`
-                                  : day.full
-                              }
-                              disabled={disabled}
+                              title={day.full}
                               onClick={() =>
                                 setForm((f) => ({
                                   ...f,
                                   schedules: toggleScheduleDay(f.schedules, index, day.code),
                                 }))
                               }
-                              className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                              className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                                 selected
                                   ? "bg-dobby-600 text-white border-dobby-600"
                                   : "bg-white text-gray-600 border-gray-200 hover:border-dobby-300"
@@ -1308,7 +1280,8 @@ export default function ShopsPage() {
                   </button>
                 ) : null}
                 <p className="text-xs text-gray-500">
-                  Úsalo si el negocio abre distinto el sábado o el domingo, por ejemplo lun–vie 9:00–18:00 y sáb 9:00–14:00.
+                  Puedes repetir días para un segundo turno (lun–sáb 10:00–14:30 y 16:30–21:00) o
+                  poner el domingo aparte.
                 </p>
               </div>
               <div>
