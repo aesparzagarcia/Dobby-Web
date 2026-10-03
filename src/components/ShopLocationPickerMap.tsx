@@ -6,6 +6,12 @@ import L from "leaflet";
 
 import { isUsableWgs84Point } from "@/lib/geo";
 import {
+  getGoogleMapsBrowserKey,
+  loadGoogleMapsScript,
+  onGoogleMapsAuthFailure,
+  reverseGeocodeGoogle,
+} from "@/lib/googleMaps";
+import {
   hasValidServiceAreaPolygon,
   isInsideServiceArea,
   loadServiceAreaRing,
@@ -15,12 +21,16 @@ import {
 const MAP_OPTIONS: L.MapOptions = {
   inertia: false,
   minZoom: 14,
-  maxZoom: 18,
+  maxZoom: 20,
   scrollWheelZoom: false,
   doubleClickZoom: false,
   boxZoom: false,
   zoomControl: true,
 };
+
+const GOOGLE_MAP_MIN_ZOOM = 14;
+const GOOGLE_MAP_MAX_ZOOM = 21;
+const GOOGLE_MAP_DEFAULT_ZOOM = 18;
 
 /** Igual que en Dobby Android: debounce al mover la cámara antes de geocodificar. */
 const MAP_MOVE_DEBOUNCE_MS = 550;
@@ -66,7 +76,7 @@ function fallbackShortFromDisplayName(displayName: string): string {
   return parts.slice(0, 3).join(", ");
 }
 
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+async function reverseGeocodeNominatim(lat: number, lng: number): Promise<string | null> {
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}&accept-language=es`;
   try {
     const res = await fetch(url, { headers: { Accept: "application/json" } });
@@ -80,6 +90,12 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
   } catch {
     return null;
   }
+}
+
+async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  const fromGoogle = await reverseGeocodeGoogle(lat, lng);
+  if (fromGoogle) return fromGoogle;
+  return reverseGeocodeNominatim(lat, lng);
 }
 
 function CenterPinOverlay() {
@@ -205,7 +221,118 @@ type ShopLocationMapCanvasProps = {
   onCenterFlush: (lat: number, lng: number) => void;
 };
 
-const ShopLocationMapCanvas = memo(function ShopLocationMapCanvas({
+function ShopLocationGoogleMapCanvas({
+  initialCenter,
+  onCenterIdle,
+  onCenterFlush,
+}: ShopLocationMapCanvasProps) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const onCenterIdleRef = useRef(onCenterIdle);
+  const onCenterFlushRef = useRef(onCenterFlush);
+  const moveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  onCenterIdleRef.current = onCenterIdle;
+  onCenterFlushRef.current = onCenterFlush;
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const apiKey = getGoogleMapsBrowserKey();
+    if (!host || !apiKey) return;
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+    const listeners: google.maps.MapsEventListener[] = [];
+
+    const clearMoveTimer = () => {
+      if (moveDebounceRef.current) {
+        clearTimeout(moveDebounceRef.current);
+        moveDebounceRef.current = null;
+      }
+    };
+
+    let t1 = 0;
+    let t2 = 0;
+
+    void loadGoogleMapsScript(apiKey)
+      .then(() => {
+        if (cancelled || !hostRef.current) return;
+        const map = new google.maps.Map(hostRef.current, {
+          center: { lat: initialCenter[0], lng: initialCenter[1] },
+          zoom: GOOGLE_MAP_DEFAULT_ZOOM,
+          minZoom: GOOGLE_MAP_MIN_ZOOM,
+          maxZoom: GOOGLE_MAP_MAX_ZOOM,
+          mapTypeId: "roadmap",
+          disableDefaultUI: true,
+          zoomControl: true,
+          zoomControlOptions: { position: google.maps.ControlPosition.LEFT_TOP },
+          gestureHandling: "greedy",
+          scrollwheel: false,
+          clickableIcons: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          keyboardShortcuts: false,
+        });
+        mapRef.current = map;
+
+        const readCenter = () => {
+          const c = map.getCenter();
+          if (!c) return null;
+          return { lat: c.lat(), lng: c.lng() };
+        };
+
+        const scheduleIdle = () => {
+          clearMoveTimer();
+          moveDebounceRef.current = setTimeout(() => {
+            moveDebounceRef.current = null;
+            const c = readCenter();
+            if (c) onCenterIdleRef.current(c.lat, c.lng);
+          }, MAP_MOVE_DEBOUNCE_MS);
+        };
+
+        const flush = () => {
+          clearMoveTimer();
+          const c = readCenter();
+          if (c) onCenterFlushRef.current(c.lat, c.lng);
+        };
+
+        listeners.push(map.addListener("center_changed", scheduleIdle));
+        listeners.push(map.addListener("idle", flush));
+        flush();
+
+        const fixSize = () => {
+          if (cancelled || !mapRef.current) return;
+          google.maps.event.trigger(map, "resize");
+          const c = readCenter();
+          if (c) map.setCenter(c);
+        };
+        t1 = window.setTimeout(fixSize, 120);
+        t2 = window.setTimeout(fixSize, 400);
+        if (typeof ResizeObserver !== "undefined" && hostRef.current) {
+          resizeObserver = new ResizeObserver(() => fixSize());
+          resizeObserver.observe(hostRef.current);
+        }
+      })
+      .catch(() => {
+        mapRef.current = null;
+      });
+
+    return () => {
+      cancelled = true;
+      clearMoveTimer();
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      listeners.forEach((l) => l.remove());
+      resizeObserver?.disconnect();
+      mapRef.current = null;
+      if (hostRef.current) hostRef.current.innerHTML = "";
+    };
+  }, [initialCenter]);
+
+  return <div ref={hostRef} className="h-full w-full" />;
+}
+
+const ShopLocationLeafletMapCanvas = memo(function ShopLocationLeafletMapCanvas({
   initialCenter,
   onCenterIdle,
   onCenterFlush,
@@ -218,13 +345,45 @@ const ShopLocationMapCanvas = memo(function ShopLocationMapCanvas({
       {...MAP_OPTIONS}
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        maxZoom={20}
+        subdomains="abcd"
       />
       <MapLayoutFix />
       <MapCenterTracker onCenterIdle={onCenterIdle} onCenterFlush={onCenterFlush} />
     </MapContainer>
   );
+});
+
+const ShopLocationMapCanvas = memo(function ShopLocationMapCanvas(props: ShopLocationMapCanvasProps) {
+  const [useGoogle, setUseGoogle] = useState(() => Boolean(getGoogleMapsBrowserKey()));
+
+  useEffect(() => {
+    const key = getGoogleMapsBrowserKey();
+    if (!key) {
+      setUseGoogle(false);
+      return;
+    }
+    const offAuth = onGoogleMapsAuthFailure(() => setUseGoogle(false));
+    let cancelled = false;
+    void loadGoogleMapsScript(key)
+      .then(() => {
+        if (!cancelled) setUseGoogle(true);
+      })
+      .catch(() => {
+        if (!cancelled) setUseGoogle(false);
+      });
+    return () => {
+      cancelled = true;
+      offAuth();
+    };
+  }, []);
+
+  if (useGoogle && getGoogleMapsBrowserKey()) {
+    return <ShopLocationGoogleMapCanvas {...props} />;
+  }
+  return <ShopLocationLeafletMapCanvas {...props} />;
 });
 
 export type ShopLocationPickerMapProps = {
@@ -346,7 +505,7 @@ export function ShopLocationPickerMap({
     <div className="flex flex-col gap-3">
       <p className="text-sm text-gray-600">
         Desplaza el mapa; el pin indica la ubicación. La dirección se actualiza según el centro del mapa.
-        Usa los botones +/− para acercar o alejar.
+        Usa +/− para acercar o alejar.
       </p>
       <div
         className="relative h-[280px] w-full rounded-lg overflow-hidden border border-gray-200 z-0 touch-none"
