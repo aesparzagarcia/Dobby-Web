@@ -1146,6 +1146,9 @@ export default function ShopsPage() {
                   placeholder="tienda@correo.com"
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Puede repetirse si el mismo negocio tiene varias sucursales.
+                </p>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
