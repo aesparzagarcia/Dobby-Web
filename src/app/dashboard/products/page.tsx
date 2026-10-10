@@ -14,11 +14,14 @@ import {
 const MAX_PHOTOS = 3;
 const PAGE_SIZE = 8;
 
+type ProductServing = { kind: string; price: number };
+
 type Product = {
   id: string;
   name: string;
   description: string | null;
   price: string | number;
+  servings?: ProductServing[];
   imageUrls: string[];
   hasPromotion: boolean;
   discount: number;
@@ -46,6 +49,32 @@ const CATEGORY_TABS: { id: CategoryFilter; label: string; icon: string }[] = [
 
 function isCarWashShop(shop: { type?: string } | null | undefined) {
   return shop?.type === "CAR_WASH";
+}
+
+function isRestaurantShop(shop: { type?: string } | null | undefined) {
+  return shop?.type === "RESTAURANT";
+}
+
+function servingPriceOf(servings: ProductServing[] | undefined, kind: string): string {
+  const found = servings?.find((s) => s.kind === kind);
+  return found != null ? String(found.price) : "";
+}
+
+function servingsFromForm(form: { priceOrden: string; priceMediaOrden: string; pricePieza: string }) {
+  const rows: { kind: "ORDEN" | "MEDIA_ORDEN" | "PIEZA"; price: number }[] = [];
+  const pairs: [string, "ORDEN" | "MEDIA_ORDEN" | "PIEZA"][] = [
+    [form.priceOrden, "ORDEN"],
+    [form.priceMediaOrden, "MEDIA_ORDEN"],
+    [form.pricePieza, "PIEZA"],
+  ];
+  for (const [raw, kind] of pairs) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const price = Number(trimmed);
+    if (!Number.isFinite(price) || price < 0) continue;
+    rows.push({ kind, price });
+  }
+  return rows;
 }
 
 function categoryForShop(shop: Shop | undefined): ProductCategoryValue {
@@ -122,11 +151,17 @@ function ProductCard({
   togglingActive: boolean;
 }) {
   const { canWrite } = useAdminAccess();
+  const servings = Array.isArray(p.servings) ? p.servings : [];
   const displayPrice =
     p.hasPromotion && p.discount > 0
       ? getDiscountedPrice(p.price, p.discount)
       : Number(p.price) || 0;
   const originalPrice = Number(p.price) || 0;
+  const servingLabels: Record<string, string> = {
+    ORDEN: "Orden",
+    MEDIA_ORDEN: "Media",
+    PIEZA: "Pieza",
+  };
 
   const imageBlock = (
     <div
@@ -196,17 +231,27 @@ function ProductCard({
   const priceRow = (
     <div className="mt-2 flex items-center justify-between gap-3">
       <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        <span className="text-lg font-bold text-gray-900 tabular-nums">
-          {formatMoney(displayPrice)}
-        </span>
+        {servings.length > 0 ? (
+          <span className="text-sm font-semibold text-gray-900 tabular-nums">
+            {servings
+              .map((s) => `${servingLabels[s.kind] ?? s.kind} ${formatMoney(Number(s.price) || 0)}`)
+              .join(" · ")}
+          </span>
+        ) : (
+          <span className="text-lg font-bold text-gray-900 tabular-nums">
+            {formatMoney(displayPrice)}
+          </span>
+        )}
         {p.hasPromotion && p.discount > 0 && (
           <>
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
               -{p.discount}%
             </span>
-            <span className="text-xs text-gray-400 line-through tabular-nums">
-              {formatMoney(originalPrice)}
-            </span>
+            {servings.length === 0 && (
+              <span className="text-xs text-gray-400 line-through tabular-nums">
+                {formatMoney(originalPrice)}
+              </span>
+            )}
           </>
         )}
       </div>
@@ -279,6 +324,9 @@ export default function ProductsPage() {
     name: "",
     description: "",
     price: "",
+    priceOrden: "",
+    priceMediaOrden: "",
+    pricePieza: "",
     imageUrls: [] as string[],
     hasPromotion: false,
     discount: 0,
@@ -294,6 +342,8 @@ export default function ProductsPage() {
   const selectedShop = shops.find((s) => s.id === form.shopId);
   const formShopIsCarWash =
     modal === "edit" ? editShopType === "CAR_WASH" : isCarWashShop(selectedShop);
+  const formShopIsRestaurant =
+    modal === "edit" ? editShopType === "RESTAURANT" : isRestaurantShop(selectedShop);
 
   function load() {
     Promise.all([
@@ -365,11 +415,22 @@ export default function ProductsPage() {
     const resolvedCategory = formShopIsCarWash
       ? CAR_WASH_PRODUCT_CATEGORY
       : form.category;
+    const servings = formShopIsRestaurant ? servingsFromForm(form) : [];
+    if (formShopIsRestaurant && servings.length === 0) {
+      alert("Agrega al menos un precio: orden, media orden o pieza.");
+      return;
+    }
+    if (!formShopIsRestaurant && (form.price === "" || Number.isNaN(Number(form.price)))) {
+      alert("El precio es obligatorio.");
+      return;
+    }
     const body = editId
       ? {
           name: form.name,
           description: form.description || null,
-          price: form.price ? Number(form.price) : undefined,
+          ...(formShopIsRestaurant
+            ? { servings }
+            : { price: form.price ? Number(form.price) : undefined, servings: [] }),
           imageUrls: form.imageUrls,
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
@@ -380,7 +441,7 @@ export default function ProductsPage() {
           shopId: form.shopId,
           name: form.name,
           description: form.description || null,
-          price: Number(form.price),
+          ...(formShopIsRestaurant ? { servings } : { price: Number(form.price), servings: [] }),
           imageUrls: form.imageUrls,
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
@@ -401,6 +462,9 @@ export default function ProductsPage() {
         name: "",
         description: "",
         price: "",
+        priceOrden: "",
+        priceMediaOrden: "",
+        pricePieza: "",
         imageUrls: [],
         hasPromotion: false,
         discount: 0,
@@ -424,6 +488,9 @@ export default function ProductsPage() {
       name: "",
       description: "",
       price: "",
+      priceOrden: "",
+      priceMediaOrden: "",
+      pricePieza: "",
       imageUrls: [],
       hasPromotion: false,
       discount: 0,
@@ -435,11 +502,15 @@ export default function ProductsPage() {
   function openEdit(p: Product) {
     setEditId(p.id);
     setEditShopType(p.shop?.type ?? null);
+    const servings = Array.isArray(p.servings) ? p.servings : [];
     setForm({
       shopId: "",
       name: p.name,
       description: p.description || "",
       price: String(p.price),
+      priceOrden: servingPriceOf(servings, "ORDEN") || (servings.length === 0 ? String(p.price) : ""),
+      priceMediaOrden: servingPriceOf(servings, "MEDIA_ORDEN"),
+      pricePieza: servingPriceOf(servings, "PIEZA"),
       imageUrls: Array.isArray(p.imageUrls) ? [...p.imageUrls] : [],
       hasPromotion: !!p.hasPromotion,
       discount: Number.isFinite(Number(p.discount)) ? Number(p.discount) : 0,
@@ -706,6 +777,9 @@ export default function ProductsPage() {
                         ...f,
                         shopId,
                         category: categoryForShop(shop),
+                        priceOrden: "",
+                        priceMediaOrden: "",
+                        pricePieza: "",
                       }));
                     }}
                     className="w-full border rounded-lg px-3 py-2"
@@ -728,17 +802,66 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-600">Precio</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2"
-                  required
-                />
-              </div>
+              {formShopIsRestaurant ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Precios del restaurante</p>
+                  <p className="text-xs text-gray-500">
+                    Llena los tamaños que ofrezcas. Al menos uno es obligatorio.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Orden</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.priceOrden}
+                        onChange={(e) => setForm((f) => ({ ...f, priceOrden: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Media orden</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.priceMediaOrden}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, priceMediaOrden: e.target.value }))
+                        }
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Pieza</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.pricePieza}
+                        onChange={(e) => setForm((f) => ({ ...f, pricePieza: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-gray-600">Precio</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2"
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-gray-600">Descripción</label>
                 <textarea
