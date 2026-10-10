@@ -5,12 +5,11 @@ import { resolveBackendUrl } from "@/lib/backendUrl";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-const PROXY_TIMEOUT_MS = 15_000;
+const PROXY_TIMEOUT_MS = 60_000;
 
 const REQUEST_HEADERS = [
-  "cookie",
   "content-type",
   "authorization",
   "accept",
@@ -24,10 +23,20 @@ type Proxied = {
   body: Buffer;
 };
 
+/** Next sometimes omits the Cookie header on multipart POST; rebuild it from the store. */
+function cookieHeaderFrom(req: NextRequest): string | null {
+  const header = req.headers.get("cookie");
+  if (header?.trim()) return header;
+  const parts = req.cookies.getAll();
+  if (parts.length === 0) return null;
+  return parts.map((c) => `${c.name}=${encodeURIComponent(c.value)}`).join("; ");
+}
+
 function proxyHttp(
   target: string,
   method: string,
   reqHeaders: Headers,
+  cookie: string | null,
   body: Buffer
 ): Promise<Proxied> {
   const u = new URL(target);
@@ -36,9 +45,20 @@ function proxyHttp(
     host: u.host,
     "content-length": body.length,
   };
+  if (cookie) headers.cookie = cookie;
   for (const name of REQUEST_HEADERS) {
     const value = reqHeaders.get(name);
     if (value) headers[name] = value;
+  }
+  if (!headers["x-csrf-token"] && cookie) {
+    const csrf = cookie.match(/(?:^|;\s*)ewe_csrf=([^;]*)/);
+    if (csrf?.[1]) {
+      try {
+        headers["x-csrf-token"] = decodeURIComponent(csrf[1].trim());
+      } catch {
+        headers["x-csrf-token"] = csrf[1].trim();
+      }
+    }
   }
 
   return new Promise((resolve, reject) => {
@@ -88,7 +108,13 @@ async function proxy(req: NextRequest, path: string[] | undefined): Promise<Next
         ? Buffer.alloc(0)
         : Buffer.from(await req.arrayBuffer());
 
-    const upstream = await proxyHttp(target, method, req.headers, body);
+    const upstream = await proxyHttp(
+      target,
+      method,
+      req.headers,
+      cookieHeaderFrom(req),
+      body
+    );
     const out = new Headers();
     for (const [key, value] of Object.entries(upstream.headers)) {
       if (!value) continue;

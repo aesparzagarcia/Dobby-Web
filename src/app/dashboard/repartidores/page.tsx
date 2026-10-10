@@ -265,6 +265,10 @@ export default function DeliveryMenPage() {
       alert("Solo se permiten imágenes (JPEG, PNG, GIF, WebP).");
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("La imagen pesa más de 10 MB. Tómala de nuevo o comprímela.");
+      return;
+    }
     setAddressProofUploading(true);
     try {
       const formData = new FormData();

@@ -10,6 +10,11 @@ function resolveBackendUrl() {
 const backendUrl = resolveBackendUrl();
 
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "15mb",
+    },
+  },
   async rewrites() {
     return [
       {
