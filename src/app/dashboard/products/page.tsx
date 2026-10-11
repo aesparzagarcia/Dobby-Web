@@ -254,7 +254,7 @@ function ProductCard({
 
   const variantList = hasMultiple ? (
     <ul className="mt-3 space-y-1.5">
-      {variants.slice(0, 5).map((s, i) => (
+      {variants.slice(0, 3).map((s, i) => (
         <li
           key={s.id ?? `${s.name}-${i}`}
           className="flex items-baseline gap-2 text-[13px] text-dobby-pure-onyx"
@@ -267,8 +267,8 @@ function ProductCard({
           </span>
         </li>
       ))}
-      {variants.length > 5 && (
-        <li className="pl-3.5 text-xs text-dobby-pure-ash">+{variants.length - 5} más</li>
+      {variants.length > 3 && (
+        <li className="pl-3.5 text-xs text-dobby-pure-ash">+{variants.length - 3} más</li>
       )}
     </ul>
   ) : null;
