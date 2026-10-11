@@ -15,14 +15,14 @@ import {
 const MAX_PHOTOS = 3;
 const PAGE_SIZE = 8;
 
-type ProductServing = { kind: string; price: number };
+type ProductVariant = { id?: string; name: string; price: number };
 
 type Product = {
   id: string;
   name: string;
   description: string | null;
   price: string | number;
-  servings?: ProductServing[];
+  variants?: ProductVariant[];
   imageUrls: string[];
   hasPromotion: boolean;
   discount: number;
@@ -64,24 +64,37 @@ function isRestaurantShop(shop: { type?: string } | null | undefined) {
   return shop?.type === "RESTAURANT";
 }
 
-function servingPriceOf(servings: ProductServing[] | undefined, kind: string): string {
-  const found = servings?.find((s) => s.kind === kind);
-  return found != null ? String(found.price) : "";
+const DEFAULT_VARIANT_NAME = "Única";
+
+function isUnicaName(name: string | undefined | null): boolean {
+  const n = (name ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "");
+  return n === "unica";
 }
 
-function servingsFromForm(form: { priceOrden: string; priceMediaOrden: string; pricePieza: string }) {
-  const rows: { kind: "ORDEN" | "MEDIA_ORDEN" | "PIEZA"; price: number }[] = [];
-  const pairs: [string, "ORDEN" | "MEDIA_ORDEN" | "PIEZA"][] = [
-    [form.priceOrden, "ORDEN"],
-    [form.priceMediaOrden, "MEDIA_ORDEN"],
-    [form.pricePieza, "PIEZA"],
-  ];
-  for (const [raw, kind] of pairs) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const price = Number(trimmed);
-    if (!Number.isFinite(price) || price < 0) continue;
-    rows.push({ kind, price });
+function productVariants(p: Product): ProductVariant[] {
+  return Array.isArray(p.variants) ? p.variants : [];
+}
+
+function variantsFromForm(form: {
+  saleType: "unique" | "variants";
+  price: string;
+  variantRows: { name: string; price: string }[];
+}): { name: string; price: number }[] {
+  if (form.saleType === "unique") {
+    const price = Number(form.price);
+    if (!Number.isFinite(price) || price < 0) return [];
+    return [{ name: DEFAULT_VARIANT_NAME, price }];
+  }
+  const rows: { name: string; price: number }[] = [];
+  for (const row of form.variantRows) {
+    const name = row.name.trim();
+    const price = Number(row.price);
+    if (!name || !Number.isFinite(price) || price < 0) continue;
+    rows.push({ name, price });
   }
   return rows;
 }
@@ -160,17 +173,12 @@ function ProductCard({
   togglingActive: boolean;
 }) {
   const { canWrite } = useAdminAccess();
-  const servings = Array.isArray(p.servings) ? p.servings : [];
+  const variants = productVariants(p);
   const displayPrice =
     p.hasPromotion && p.discount > 0
       ? getDiscountedPrice(p.price, p.discount)
       : Number(p.price) || 0;
   const originalPrice = Number(p.price) || 0;
-  const servingLabels: Record<string, string> = {
-    ORDEN: "Orden",
-    MEDIA_ORDEN: "Media",
-    PIEZA: "Pieza",
-  };
 
   const imageBlock = (
     <div
@@ -240,10 +248,10 @@ function ProductCard({
   const priceRow = (
     <div className="mt-2 flex items-center justify-between gap-3">
       <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        {servings.length > 0 ? (
+        {variants.length > 1 ? (
           <span className="text-sm font-semibold text-gray-900 tabular-nums">
-            {servings
-              .map((s) => `${servingLabels[s.kind] ?? s.kind} ${formatMoney(Number(s.price) || 0)}`)
+            {variants
+              .map((s) => `${s.name} ${formatMoney(Number(s.price) || 0)}`)
               .join(" · ")}
           </span>
         ) : (
@@ -256,7 +264,7 @@ function ProductCard({
             <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
               -{p.discount}%
             </span>
-            {servings.length === 0 && (
+            {variants.length <= 1 && (
               <span className="text-xs text-gray-400 line-through tabular-nums">
                 {formatMoney(originalPrice)}
               </span>
@@ -328,20 +336,20 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
-  const [form, setForm] = useState({
+  const emptyForm = {
     shopId: "",
     name: "",
     description: "",
+    saleType: "unique" as "unique" | "variants",
     price: "",
-    priceOrden: "",
-    priceMediaOrden: "",
-    pricePieza: "",
+    variantRows: [{ name: "", price: "" }] as { name: string; price: string }[],
     imageUrls: [] as string[],
     hasPromotion: false,
     discount: 0,
     isActive: true,
     category: DEFAULT_PRODUCT_CATEGORY,
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [editShopType, setEditShopType] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -424,22 +432,27 @@ export default function ProductsPage() {
     const resolvedCategory = formShopIsCarWash
       ? CAR_WASH_PRODUCT_CATEGORY
       : form.category;
-    const servings = formShopIsRestaurant ? servingsFromForm(form) : [];
-    if (formShopIsRestaurant && servings.length === 0) {
-      alert("Agrega al menos un precio: orden, media orden o pieza.");
+    const variants = formShopIsRestaurant ? variantsFromForm(form) : [];
+    if (formShopIsRestaurant && variants.length === 0) {
+      alert(
+        form.saleType === "unique"
+          ? "El precio es obligatorio."
+          : "Agrega al menos una presentación con nombre y precio."
+      );
       return;
     }
     if (!formShopIsRestaurant && (form.price === "" || Number.isNaN(Number(form.price)))) {
       alert("El precio es obligatorio.");
       return;
     }
+    const pricePayload = formShopIsRestaurant
+      ? { variants }
+      : { price: form.price ? Number(form.price) : undefined, variants: [] };
     const body = editId
       ? {
           name: form.name,
           description: form.description || null,
-          ...(formShopIsRestaurant
-            ? { servings }
-            : { price: form.price ? Number(form.price) : undefined, servings: [] }),
+          ...pricePayload,
           imageUrls: form.imageUrls,
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
@@ -450,7 +463,7 @@ export default function ProductsPage() {
           shopId: form.shopId,
           name: form.name,
           description: form.description || null,
-          ...(formShopIsRestaurant ? { servings } : { price: Number(form.price), servings: [] }),
+          ...pricePayload,
           imageUrls: form.imageUrls,
           hasPromotion: form.hasPromotion,
           discount: normalizedDiscount,
@@ -467,17 +480,8 @@ export default function ProductsPage() {
       setEditId(null);
       setEditShopType(null);
       setForm({
+        ...emptyForm,
         shopId: shops[0]?.id || "",
-        name: "",
-        description: "",
-        price: "",
-        priceOrden: "",
-        priceMediaOrden: "",
-        pricePieza: "",
-        imageUrls: [],
-        hasPromotion: false,
-        discount: 0,
-        isActive: true,
         category: categoryForShop(shops[0]),
       });
       load();
@@ -493,17 +497,8 @@ export default function ProductsPage() {
     setEditShopType(null);
     const first = shops[0];
     setForm({
+      ...emptyForm,
       shopId: first?.id || "",
-      name: "",
-      description: "",
-      price: "",
-      priceOrden: "",
-      priceMediaOrden: "",
-      pricePieza: "",
-      imageUrls: [],
-      hasPromotion: false,
-      discount: 0,
-      isActive: true,
       category: categoryForShop(first),
     });
   }
@@ -511,15 +506,21 @@ export default function ProductsPage() {
   function openEdit(p: Product) {
     setEditId(p.id);
     setEditShopType(p.shop?.type ?? null);
-    const servings = Array.isArray(p.servings) ? p.servings : [];
+    const variants = productVariants(p);
+    const uniqueOnly =
+      variants.length === 0 || (variants.length === 1 && isUnicaName(variants[0]?.name));
     setForm({
       shopId: "",
       name: p.name,
       description: p.description || "",
-      price: String(p.price),
-      priceOrden: servingPriceOf(servings, "ORDEN") || (servings.length === 0 ? String(p.price) : ""),
-      priceMediaOrden: servingPriceOf(servings, "MEDIA_ORDEN"),
-      pricePieza: servingPriceOf(servings, "PIEZA"),
+      saleType: uniqueOnly ? "unique" : "variants",
+      price: uniqueOnly
+        ? String(variants[0]?.price ?? p.price)
+        : String(p.price),
+      variantRows:
+        uniqueOnly
+          ? [{ name: "", price: "" }]
+          : variants.map((v) => ({ name: v.name, price: String(v.price) })),
       imageUrls: Array.isArray(p.imageUrls) ? [...p.imageUrls] : [],
       hasPromotion: !!p.hasPromotion,
       discount: Number.isFinite(Number(p.discount)) ? Number(p.discount) : 0,
@@ -786,9 +787,9 @@ export default function ProductsPage() {
                         ...f,
                         shopId,
                         category: categoryForShop(shop),
-                        priceOrden: "",
-                        priceMediaOrden: "",
-                        pricePieza: "",
+                        saleType: "unique",
+                        price: "",
+                        variantRows: [{ name: "", price: "" }],
                       }));
                     }}
                     className="w-full border rounded-lg px-3 py-2"
@@ -812,51 +813,123 @@ export default function ProductsPage() {
                 />
               </div>
               {formShopIsRestaurant ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Precios del restaurante</p>
-                  <p className="text-xs text-gray-500">
-                    Llena los tamaños que ofrezcas. Al menos uno es obligatorio.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Orden</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={form.priceOrden}
-                        onChange={(e) => setForm((f) => ({ ...f, priceOrden: e.target.value }))}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Media orden</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={form.priceMediaOrden}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, priceMediaOrden: e.target.value }))
-                        }
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Pieza</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={form.pricePieza}
-                        onChange={(e) => setForm((f) => ({ ...f, pricePieza: e.target.value }))}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="0.00"
-                      />
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Precio y presentaciones</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Elige si el producto tiene un solo precio o varias presentaciones.
+                    </p>
+                    <div className="mt-2 flex gap-4">
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="radio"
+                          name="saleType"
+                          checked={form.saleType === "unique"}
+                          onChange={() => setForm((f) => ({ ...f, saleType: "unique" }))}
+                        />
+                        Precio único
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="radio"
+                          name="saleType"
+                          checked={form.saleType === "variants"}
+                          onChange={() =>
+                            setForm((f) => ({
+                              ...f,
+                              saleType: "variants",
+                              variantRows:
+                                f.variantRows.length > 0 ? f.variantRows : [{ name: "", price: "" }],
+                            }))
+                          }
+                        />
+                        Variantes
+                      </label>
                     </div>
                   </div>
+                  {form.saleType === "unique" ? (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Precio</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.price}
+                        onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500">Presentaciones</p>
+                      {form.variantRows.map((row, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            value={row.name}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                variantRows: f.variantRows.map((r, i) =>
+                                  i === index ? { ...r, name: e.target.value } : r
+                                ),
+                              }))
+                            }
+                            className="flex-1 border rounded-lg px-3 py-2"
+                            placeholder="Ej. 6 piezas"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.price}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                variantRows: f.variantRows.map((r, i) =>
+                                  i === index ? { ...r, price: e.target.value } : r
+                                ),
+                              }))
+                            }
+                            className="w-28 border rounded-lg px-3 py-2"
+                            placeholder="0.00"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                variantRows:
+                                  f.variantRows.length === 1
+                                    ? f.variantRows
+                                    : f.variantRows.filter((_, i) => i !== index),
+                              }))
+                            }
+                            className="text-red-500 p-1 disabled:opacity-30"
+                            title="Quitar"
+                            disabled={form.variantRows.length === 1}
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            variantRows: [...f.variantRows, { name: "", price: "" }],
+                          }))
+                        }
+                        className="text-sm text-dobby-700 font-medium hover:underline"
+                      >
+                        + Agregar presentación
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
