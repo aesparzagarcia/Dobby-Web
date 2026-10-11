@@ -159,6 +159,19 @@ function IconList({ className }: { className?: string }) {
   );
 }
 
+function IconCart({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13L5.4 5M7 13l-2.3 2.3c-.4.4-.1 1.1.4 1.1H19M10 20a1 1 0 11-2 0 1 1 0 012 0zm9 0a1 1 0 11-2 0 1 1 0 012 0z"
+      />
+    </svg>
+  );
+}
+
 function ProductCard({
   product: p,
   viewMode,
@@ -174,16 +187,22 @@ function ProductCard({
 }) {
   const { canWrite } = useAdminAccess();
   const variants = productVariants(p);
+  const hasMultiple = variants.length > 1;
+  const originalPrice = Number(p.price) || 0;
   const displayPrice =
     p.hasPromotion && p.discount > 0
       ? getDiscountedPrice(p.price, p.discount)
-      : Number(p.price) || 0;
-  const originalPrice = Number(p.price) || 0;
+      : originalPrice;
+  const description = p.description?.trim() ?? "";
+
+  function variantUnit(price: number) {
+    return p.hasPromotion && p.discount > 0 ? getDiscountedPrice(price, p.discount) : price;
+  }
 
   const imageBlock = (
     <div
-      className={`relative bg-gray-100 overflow-hidden shrink-0 ${
-        viewMode === "grid" ? "aspect-square w-full rounded-xl" : "w-24 h-24 rounded-lg"
+      className={`relative bg-dobby-pure-fog overflow-hidden shrink-0 ${
+        viewMode === "grid" ? "aspect-[4/3] w-full" : "w-28 h-28 rounded-xl"
       }`}
     >
       {Array.isArray(p.imageUrls) && p.imageUrls.length > 0 ? (
@@ -193,37 +212,25 @@ function ProductCard({
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+        <div className="w-full h-full flex items-center justify-center text-dobby-pure-ash text-xs">
           Sin imagen
         </div>
       )}
+      {p.hasPromotion && p.discount > 0 && (
+        <span className="absolute top-3 left-3 rounded-full bg-dobby-pure-onyx px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+          -{p.discount}%
+        </span>
+      )}
       {!p.isActive && (
-        <span className="absolute top-2 left-2 rounded-full bg-gray-900/70 px-2 py-0.5 text-[10px] font-medium text-white">
+        <span className="absolute top-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white">
           Inactivo
         </span>
       )}
     </div>
   );
 
-  const titleBlock = (
-    <>
-      <h3 className="font-semibold text-gray-900 truncate" title={p.name}>
-        {p.name}
-      </h3>
-      <p className="text-sm text-gray-500 truncate mt-0.5" title={p.shop?.name}>
-        {p.shop?.name ?? "—"}
-      </p>
-      <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
-        {p.quantitySold ?? 0} vendido{(p.quantitySold ?? 0) === 1 ? "" : "s"}
-      </p>
-    </>
-  );
-
   const activeToggle = (
-    <div
-      className="flex items-center gap-2 shrink-0"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         role="switch"
@@ -231,8 +238,8 @@ function ProductCard({
         aria-label={p.isActive ? "Desactivar producto" : "Activar producto"}
         disabled={togglingActive || !canWrite}
         onClick={() => onToggleActive(!p.isActive)}
-        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400/40 disabled:opacity-50 ${
-          p.isActive ? "bg-gray-900" : "bg-gray-200"
+        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-dobby-pure-onyx/30 disabled:opacity-50 ${
+          p.isActive ? "bg-dobby-pure-onyx" : "bg-dobby-pure-mist"
         }`}
       >
         <span
@@ -241,65 +248,78 @@ function ProductCard({
           }`}
         />
       </button>
-      <span className="text-xs text-gray-600">{p.isActive ? "Activo" : "Inactivo"}</span>
+      <span className="text-xs text-dobby-pure-graphite">{p.isActive ? "Activo" : "Inactivo"}</span>
     </div>
   );
 
-  const priceRow = (
-    <div className="mt-2 flex items-center justify-between gap-3">
-      <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        {variants.length > 1 ? (
-          <span className="text-sm font-semibold text-gray-900 tabular-nums">
-            {variants
-              .map((s) => `${s.name} ${formatMoney(Number(s.price) || 0)}`)
-              .join(" · ")}
+  const variantList = hasMultiple ? (
+    <ul className="mt-3 space-y-1.5">
+      {variants.slice(0, 5).map((s, i) => (
+        <li
+          key={s.id ?? `${s.name}-${i}`}
+          className="flex items-baseline gap-2 text-[13px] text-dobby-pure-onyx"
+        >
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-dobby-pure-onyx" />
+          <span className="min-w-0 flex-1 truncate">{s.name}</span>
+          <span className="grow border-b border-dotted border-dobby-pure-mist mx-1" />
+          <span className="shrink-0 font-semibold tabular-nums">
+            {formatMoney(variantUnit(Number(s.price) || 0))}
           </span>
-        ) : (
-          <span className="text-lg font-bold text-gray-900 tabular-nums">
-            {formatMoney(displayPrice)}
-          </span>
-        )}
-        {p.hasPromotion && p.discount > 0 && (
-          <>
-            <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
-              -{p.discount}%
-            </span>
-            {variants.length <= 1 && (
-              <span className="text-xs text-gray-400 line-through tabular-nums">
-                {formatMoney(originalPrice)}
-              </span>
-            )}
-          </>
-        )}
-      </div>
-      {activeToggle}
-    </div>
-  );
+        </li>
+      ))}
+      {variants.length > 5 && (
+        <li className="pl-3.5 text-xs text-dobby-pure-ash">+{variants.length - 5} más</li>
+      )}
+    </ul>
+  ) : null;
 
   if (viewMode === "list") {
     return (
       <article
-        className={`group rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-dobby-200 transition overflow-hidden ${
-          !p.isActive ? "opacity-75" : ""
+        className={`group rounded-2xl border border-dobby-pure-mist bg-white shadow-sm hover:shadow-md transition overflow-hidden ${
+          !p.isActive ? "opacity-80" : ""
         }`}
       >
-        <div className="flex items-start gap-4 p-3">
+        <div className="flex items-stretch gap-4 p-3">
           <button
             type="button"
             onClick={onClick}
-            className="shrink-0 focus:outline-none focus:ring-2 focus:ring-dobby-500/40 rounded-lg"
+            className="shrink-0 focus:outline-none focus:ring-2 focus:ring-dobby-pure-onyx/30 rounded-xl"
           >
             {imageBlock}
           </button>
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={onClick}
-              className="w-full text-left focus:outline-none focus:ring-2 focus:ring-dobby-500/40 rounded"
-            >
-              {titleBlock}
+          <div className="min-w-0 flex-1 flex flex-col py-0.5">
+            <button type="button" onClick={onClick} className="w-full text-left focus:outline-none rounded">
+              <h3 className="font-bold text-dobby-pure-onyx truncate" title={p.name}>
+                {p.name}
+              </h3>
+              <p className="text-sm text-dobby-pure-ash truncate mt-0.5" title={p.shop?.name}>
+                {p.shop?.name ?? "—"}
+              </p>
+              {description ? (
+                <p className="text-sm text-dobby-pure-graphite mt-1 line-clamp-2">{description}</p>
+              ) : null}
             </button>
-            {priceRow}
+            {variantList}
+            <div className="mt-auto pt-3 flex items-center justify-between gap-3">
+              {!hasMultiple ? (
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-xl font-bold text-dobby-pure-onyx tabular-nums">
+                    {formatMoney(displayPrice)}
+                  </span>
+                  {p.hasPromotion && p.discount > 0 && (
+                    <span className="text-xs text-dobby-pure-ash line-through tabular-nums">
+                      {formatMoney(originalPrice)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs text-dobby-pure-ash tabular-nums">
+                  {p.quantitySold ?? 0} vendido{(p.quantitySold ?? 0) === 1 ? "" : "s"}
+                </span>
+              )}
+              {activeToggle}
+            </div>
           </div>
         </div>
       </article>
@@ -308,19 +328,60 @@ function ProductCard({
 
   return (
     <article
-      className={`group rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-dobby-200 transition overflow-hidden ${
-        !p.isActive ? "opacity-75" : ""
+      className={`group flex flex-col rounded-2xl border border-dobby-pure-mist bg-white shadow-sm hover:shadow-md transition overflow-hidden ${
+        !p.isActive ? "opacity-80" : ""
       }`}
     >
       <button
         type="button"
         onClick={onClick}
-        className="w-full p-3 pb-0 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-dobby-500/40"
+        className="w-full text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-dobby-pure-onyx/30"
       >
         {imageBlock}
-        <div className="pt-3">{titleBlock}</div>
+        <div className="px-4 pt-4">
+          <h3 className="text-[17px] font-bold text-dobby-pure-onyx leading-snug line-clamp-2" title={p.name}>
+            {p.name}
+          </h3>
+          <p className="text-sm text-dobby-pure-ash mt-1 truncate" title={p.shop?.name}>
+            {p.shop?.name ?? "—"}
+          </p>
+          {description ? (
+            <p className="text-sm text-dobby-pure-graphite mt-1.5 line-clamp-2 leading-snug">{description}</p>
+          ) : null}
+        </div>
       </button>
-      <div className="px-3 pb-3">{priceRow}</div>
+      <div className="px-4 pb-4 pt-1 flex flex-col flex-1">
+        {variantList}
+        <div className="mt-auto pt-4">
+          <div className="flex items-center justify-between gap-3">
+            {!hasMultiple ? (
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-2xl font-bold text-dobby-pure-onyx tabular-nums tracking-tight">
+                  {formatMoney(displayPrice)}
+                </span>
+                {p.hasPromotion && p.discount > 0 && (
+                  <span className="text-sm text-dobby-pure-ash line-through tabular-nums">
+                    {formatMoney(originalPrice)}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-dobby-pure-ash tabular-nums">
+                {p.quantitySold ?? 0} vendido{(p.quantitySold ?? 0) === 1 ? "" : "s"}
+              </span>
+            )}
+            {activeToggle}
+          </div>
+          <button
+            type="button"
+            onClick={onClick}
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-dobby-pure-onyx px-4 py-2.5 text-sm font-semibold text-white hover:bg-dobby-pure-carbon transition"
+          >
+            <IconCart className="w-4 h-4" />
+            Ver producto
+          </button>
+        </div>
+      </div>
     </article>
   );
 }
