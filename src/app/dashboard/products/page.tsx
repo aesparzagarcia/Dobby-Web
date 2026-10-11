@@ -8,6 +8,7 @@ import {
   CAR_WASH_PRODUCT_CATEGORY,
   DEFAULT_PRODUCT_CATEGORY,
   PRODUCT_CATEGORIES,
+  productCategoriesForShopType,
   type ProductCategoryValue,
 } from "@/lib/productCategories";
 
@@ -34,7 +35,14 @@ type Product = {
 
 type Shop = { id: string; name: string; type?: string };
 
-type CategoryFilter = "all" | "bebidas" | "alcohol" | "comidas" | "postres" | "autolavado";
+type CategoryFilter =
+  | "all"
+  | "bebidas"
+  | "alcohol"
+  | "comidas"
+  | "postres"
+  | "medicamentos"
+  | "autolavado";
 type SortKey = "recent" | "name" | "price_asc" | "price_desc" | "sold";
 type ViewMode = "grid" | "list";
 
@@ -44,6 +52,7 @@ const CATEGORY_TABS: { id: CategoryFilter; label: string; icon: string }[] = [
   { id: "alcohol", label: "Alcohol", icon: "🍾" },
   { id: "comidas", label: "Comidas", icon: "🍽" },
   { id: "postres", label: "Postres", icon: "🍰" },
+  { id: "medicamentos", label: "Medicamentos", icon: "💊" },
   { id: "autolavado", label: "Autolavado", icon: "🚗" },
 ];
 
@@ -882,7 +891,11 @@ export default function ProductsPage() {
                     className="w-full border rounded-lg px-3 py-2"
                     required
                   >
-                    {PRODUCT_CATEGORIES.filter((c) => c.value !== "autolavado").map((c) => (
+                    {productCategoriesForShopType(
+                      modal === "edit"
+                        ? editShopType
+                        : shops.find((s) => s.id === form.shopId)?.type
+                    ).map((c) => (
                       <option key={c.value} value={c.value}>
                         {c.label}
                       </option>
