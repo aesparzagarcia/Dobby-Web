@@ -133,6 +133,53 @@ function formatOpeningDays(days: string[]): string {
   return selected.map((d) => d.short).join(", ");
 }
 
+/** "Lunes – Sábado" when days are consecutive; otherwise shorts. */
+function formatOpeningDaySpan(days: string[]): string {
+  const selected = WEEKDAYS.filter((d) => days.includes(d.code));
+  if (selected.length === 0) return "";
+  if (selected.length === 7) return "Todos los días";
+  if (selected.length === 1) return selected[0].full;
+  const indexes = selected.map((d) => WEEKDAYS.findIndex((w) => w.code === d.code));
+  const consecutive = indexes.every((idx, i) => i === 0 || idx === indexes[i - 1]! + 1);
+  if (consecutive) {
+    return `${selected[0].full} – ${selected[selected.length - 1].full}`;
+  }
+  return selected.map((d) => d.short).join(", ");
+}
+
+type HourDisplayGroup = {
+  days: string[];
+  ranges: { open: string; close: string }[];
+};
+
+function groupHourWindowsForDisplay(windows: ShopHourWindow[]): HourDisplayGroup[] {
+  const groups = new Map<string, HourDisplayGroup>();
+  for (const w of windows) {
+    const days = WEEKDAYS.map((d) => d.code).filter((code) => w.days.includes(code));
+    if (days.length === 0) continue;
+    const key = days.join(",");
+    const existing = groups.get(key);
+    if (existing) {
+      existing.ranges.push({ open: w.open, close: w.close });
+    } else {
+      groups.set(key, { days, ranges: [{ open: w.open, close: w.close }] });
+    }
+  }
+  const sorted = [...groups.values()].sort((a, b) => {
+    const ai = WEEKDAYS.findIndex((d) => d.code === a.days[0]);
+    const bi = WEEKDAYS.findIndex((d) => d.code === b.days[0]);
+    return ai - bi;
+  });
+  for (const g of sorted) {
+    g.ranges.sort((a, b) => a.open.localeCompare(b.open));
+  }
+  return sorted;
+}
+
+function usesSplitHoursLayout(groups: HourDisplayGroup[]): boolean {
+  return groups.length > 1 || groups.some((g) => g.ranges.length > 1);
+}
+
 function shopHours(shop: Shop): { open: string; close: string } | null {
   const open = shop.openingHour ?? shop.opening_hour ?? null;
   const close = shop.closingHour ?? shop.closing_hour ?? null;
@@ -359,6 +406,48 @@ function IconDots({ className }: { className?: string }) {
   );
 }
 
+function ShopCardHours({ windows }: { windows: ShopHourWindow[] }) {
+  const groups = groupHourWindowsForDisplay(windows);
+  if (groups.length === 0) return null;
+
+  if (!usesSplitHoursLayout(groups)) {
+    const g = groups[0]!;
+    const range = g.ranges[0]!;
+    return (
+      <p className="text-[11px] text-gray-500 tabular-nums mt-0.5">
+        {formatOpeningDays(g.days)} · {formatHoursRange(range.open, range.close)}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-gray-100 bg-gray-50/80 px-2.5 py-1">
+      {groups.map((g, i) => (
+        <div
+          key={g.days.join("-")}
+          className={`flex items-center justify-between gap-2 py-1.5 ${
+            i > 0 ? "border-t border-gray-200" : ""
+          }`}
+        >
+          <p className="text-[11px] font-medium text-gray-800 shrink-0 leading-tight">
+            {formatOpeningDaySpan(g.days)}
+          </p>
+          <div className="flex flex-wrap justify-end gap-1 min-w-0">
+            {g.ranges.map((r) => (
+              <span
+                key={`${r.open}-${r.close}`}
+                className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-700 tabular-nums whitespace-nowrap"
+              >
+                {formatHoursRange(r.open, r.close)}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ShopCard({
   shop,
   menuOpen,
@@ -508,15 +597,7 @@ function ShopCard({
               : `Vence: ${formatDateParts(due.expiry)}`}
           </p>
         ) : null}
-        {hours.length > 0 ? (
-          <div className="mt-0.5 space-y-0.5">
-            {hours.map((w, i) => (
-              <p key={`${w.open}-${w.close}-${i}`} className="text-[11px] text-gray-500 tabular-nums">
-                {formatOpeningDays(w.days)} · {formatHoursRange(w.open, w.close)}
-              </p>
-            ))}
-          </div>
-        ) : null}
+        {hours.length > 0 ? <ShopCardHours windows={hours} /> : null}
       </div>
 
       <div className="grid grid-cols-3 border-t border-gray-100 mx-4 py-2.5 gap-2 text-center">
