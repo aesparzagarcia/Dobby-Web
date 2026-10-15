@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch, authHeaders, uploadsUrl } from "@/lib/api";
+import { apiFetch, authHeaders } from "@/lib/api";
+import { ShopCoverImage } from "@/components/ShopCoverImage";
 import {
   Bar,
   BarChart,
@@ -527,17 +528,11 @@ export default function IncomePage() {
                           <tr key={shop.shopId} className="hover:bg-gray-50/80">
                             <td className="py-3 pr-2">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                {shop.logoUrl ? (
-                                  <img
-                                    src={uploadsUrl(shop.logoUrl)}
-                                    alt=""
-                                    className="w-8 h-8 rounded-full object-cover bg-gray-100"
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-dobby-100 text-dobby-700 flex items-center justify-center text-xs font-bold shrink-0">
-                                    {shop.shopName.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
+                                <ShopCoverImage
+                                  logoUrl={shop.logoUrl}
+                                  alt={shop.shopName}
+                                  className="w-8 h-8 rounded-full object-cover bg-gray-100 shrink-0"
+                                />
                                 <span className="font-medium text-gray-900 truncate max-w-[160px]" title={shop.shopName}>
                                   {shop.shopName}
                                 </span>

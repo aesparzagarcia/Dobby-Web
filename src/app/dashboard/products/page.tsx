@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
+import { ProductCoverImage } from "@/components/ProductCoverImage";
 import { WriteOnly } from "@/components/dashboard/WriteOnly";
 import { useAdminAccess } from "@/contexts/AdminAccessContext";
 import {
@@ -205,17 +206,11 @@ function ProductCard({
         viewMode === "grid" ? "aspect-[4/3] w-full" : "w-28 h-28 rounded-xl"
       }`}
     >
-      {Array.isArray(p.imageUrls) && p.imageUrls.length > 0 ? (
-        <img
-          src={uploadsUrl(p.imageUrls[0])}
-          alt={p.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-dobby-pure-ash text-xs">
-          Sin imagen
-        </div>
-      )}
+      <ProductCoverImage
+        imageUrl={Array.isArray(p.imageUrls) ? p.imageUrls[0] : null}
+        alt={p.name}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
       {p.hasPromotion && p.discount > 0 && (
         <span className="absolute top-3 left-3 rounded-full bg-dobby-pure-onyx px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
           -{p.discount}%

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
+import { ShopCoverImage } from "@/components/ShopCoverImage";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
 import { WriteOnly } from "@/components/dashboard/WriteOnly";
 import { useAdminAccess } from "@/contexts/AdminAccessContext";
@@ -193,7 +194,7 @@ type HourWindowForm = {
   closingHour: string;
 };
 
-const MAX_HOUR_WINDOWS = 3;
+const MAX_HOUR_WINDOWS = 6;
 
 const emptyHourWindow = (days: string[] = [...ALL_WEEKDAYS]): HourWindowForm => ({
   days,
@@ -478,19 +479,7 @@ function ShopCard({
   return (
     <article className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow w-full min-w-[280px] max-w-[340px] mx-auto flex flex-col">
       <div className="relative h-[7.5rem] bg-gray-100">
-        {shop.logoUrl ? (
-          <img
-            src={uploadsUrl(shop.logoUrl)}
-            alt=""
-            className="w-full h-full object-cover object-center"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-dobby-100 to-dobby-50">
-            <span className="text-2xl font-bold text-dobby-300">
-              {shop.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
+        <ShopCoverImage logoUrl={shop.logoUrl} alt={shop.name} />
         <span
           className={`absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold backdrop-blur-sm ${ops.badge}`}
         >
