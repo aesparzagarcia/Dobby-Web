@@ -30,6 +30,7 @@ const CONFIG_KEYS = [
   "ZONE_B_FEE",
   "ZONE_C_FEE",
   "ZONE_D_FEE",
+  "SERVICE_FEE_RATE",
 ] as const;
 
 const DEMAND_OPTIONS = [1, 1.1, 1.2, 1.3, 1.4, 1.5];
@@ -46,6 +47,15 @@ function formatMoney(n: number) {
 function numDraft(draft: Record<string, string>, key: string, fallback = 0) {
   const v = Number.parseFloat(draft[key] ?? "");
   return Number.isFinite(v) ? v : fallback;
+}
+
+/** DB stores a fraction (0.08) or a percent (8). The form edits percent. */
+function serviceFeePercentFromStored(raw: string | undefined): string {
+  const n = Number.parseFloat(raw ?? "");
+  if (!Number.isFinite(n)) return "8";
+  const fraction = n > 1 ? n / 100 : n;
+  const pct = Math.round(fraction * 10000) / 100;
+  return String(pct);
 }
 
 function IconBack({ className }: { className?: string }) {
@@ -268,6 +278,10 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             Las zonas suman un extra fijo según la distancia. La lluvia es un monto fijo cuando está activa.
             El multiplicador (1.0–1.5) simula horas pico.
           </p>
+          <p>
+            El <strong>service fee</strong> es un porcentaje del subtotal de productos. Solo el super admin
+            lo cambia aquí. El IVA de esa tarifa se configura en Impuestos.
+          </p>
           <p className="text-gray-500">
             Los cambios aplican en la app al abrir o refrescar el carrito. No afectan pedidos ya creados.
           </p>
@@ -310,8 +324,10 @@ export default function ConfiguracionPage() {
           .filter((r) => (CONFIG_KEYS as readonly string[]).includes(r.key))
           .forEach((r) => {
             byKey[r.key] = r;
-            d[r.key] = r.value;
+            d[r.key] =
+              r.key === "SERVICE_FEE_RATE" ? serviceFeePercentFromStored(r.value) : r.value;
           });
+        if (!d.SERVICE_FEE_RATE) d.SERVICE_FEE_RATE = "8";
         setRowsByKey(byKey);
         setDraft(d);
         setSimRain(d.DEFAULT_IS_RAINING === "true");
@@ -369,13 +385,28 @@ export default function ConfiguracionPage() {
     setMessage(null);
     setError(null);
     try {
+      const serviceFeePercent = Number.parseFloat(draft.SERVICE_FEE_RATE ?? "");
+      if (
+        !Number.isFinite(serviceFeePercent) ||
+        serviceFeePercent < 0 ||
+        serviceFeePercent > 100
+      ) {
+        setError("El service fee debe ser un porcentaje entre 0 y 100.");
+        setSaving(false);
+        return;
+      }
       const items = Object.values(rowsByKey).map((r) => ({
         key: r.key,
         value:
-          r.type === "BOOLEAN"
-            ? draft[r.key] === "true"
-            : Number.parseFloat(draft[r.key] ?? "0"),
+          r.key === "SERVICE_FEE_RATE"
+            ? serviceFeePercent / 100
+            : r.type === "BOOLEAN"
+              ? draft[r.key] === "true"
+              : Number.parseFloat(draft[r.key] ?? "0"),
       }));
+      if (!rowsByKey.SERVICE_FEE_RATE) {
+        items.push({ key: "SERVICE_FEE_RATE", value: serviceFeePercent / 100 });
+      }
       const res = await apiFetch("/api/admin/app-config", {
         method: "PUT",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -493,6 +524,52 @@ export default function ConfiguracionPage() {
       </div>
 
       <div className="space-y-5">
+        <SectionCard
+          title="Service fee"
+          icon={<span className="text-sm font-bold">%</span>}
+          aside={
+            <div>
+              <p className="text-xs font-semibold text-dobby-600 uppercase tracking-wide mb-3">
+                Ejemplo de cálculo
+              </p>
+              <BreakdownList
+                rows={[
+                  { label: "Productos", value: formatMoney(100) },
+                  {
+                    label: `Service fee (${numDraft(draft, "SERVICE_FEE_RATE", 8)}%)`,
+                    value: formatMoney(
+                      roundMoney((100 * numDraft(draft, "SERVICE_FEE_RATE", 8)) / 100)
+                    ),
+                    highlight: true,
+                  },
+                ]}
+              />
+            </div>
+          }
+        >
+          <label className="block max-w-xs">
+            <span className="text-sm font-medium text-gray-700">Porcentaje</span>
+            <p className="text-xs text-gray-500 mt-0.5 mb-2">
+              Solo el super admin puede cambiarlo. Se cobra sobre el subtotal de productos en
+              pedidos nuevos.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={100}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                value={draft.SERVICE_FEE_RATE ?? ""}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, SERVICE_FEE_RATE: e.target.value }))
+                }
+              />
+              <span className="text-sm text-gray-500">%</span>
+            </div>
+          </label>
+        </SectionCard>
+
         {/* Rain surcharge */}
         <SectionCard
           title="Recargo por lluvia"

@@ -20,6 +20,7 @@ import {
   IconShipping,
   IconShop,
   IconStats,
+  IconTaxes,
 } from "@/components/dashboard/NavIcons";
 import { OrderAlertToasts } from "@/components/dashboard/OrderAlertToasts";
 import { PreRegistrationAlertToasts } from "@/components/dashboard/PreRegistrationAlertToasts";
@@ -37,6 +38,7 @@ import { isOwnerOnlyAdminPath } from "@/lib/adminAccess";
 const nav = [
   { href: "/dashboard", label: "Resumen", icon: IconDashboard, badgeKey: null as string | null, ownerOnly: false },
   { href: "/dashboard/income", label: "Ingresos", icon: IconIncome, badgeKey: null, ownerOnly: true },
+  { href: "/dashboard/impuestos", label: "Impuestos", icon: IconTaxes, badgeKey: null, ownerOnly: true },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: IconOrders, badgeKey: "orders" as const, ownerOnly: false },
   { href: "/dashboard/clientes", label: "Clientes", icon: IconClients, badgeKey: null, ownerOnly: false },
   { href: "/dashboard/shops", label: "Tiendas", icon: IconShop, badgeKey: null, ownerOnly: false },

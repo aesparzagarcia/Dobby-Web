@@ -12,6 +12,8 @@ export function isOwnerOnlyAdminPath(pathname: string | null | undefined): boole
   return (
     pathname === "/dashboard/income" ||
     pathname.startsWith("/dashboard/income/") ||
+    pathname === "/dashboard/impuestos" ||
+    pathname.startsWith("/dashboard/impuestos/") ||
     pathname === "/dashboard/configuracion" ||
     pathname.startsWith("/dashboard/configuracion/") ||
     pathname === "/dashboard/analytics" ||

@@ -12,6 +12,7 @@ export type DeliveryPricingSettings = {
   zoneBFee: number;
   zoneCFee: number;
   zoneDFee: number;
+  ivaRate?: number;
 };
 
 export type DeliveryPricingInput = {
