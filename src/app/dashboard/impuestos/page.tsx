@@ -25,6 +25,9 @@ type TaxData = {
     service_fee_net: number;
     service_fee_iva: number;
     service_fee_total: number;
+    courier_commission?: number;
+    courier_commission_iva?: number;
+    iva_to_declare?: number;
   };
   recent_orders: TaxRecentOrder[];
 };
@@ -231,8 +234,8 @@ export default function ImpuestosPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               label="IVA a declarar"
-              value={formatMoney(data.summary.service_fee_iva)}
-              hint={`Tasa actual ${data.iva_rate_percent}%`}
+              value={formatMoney(data.summary.iva_to_declare ?? data.summary.service_fee_iva)}
+              hint={`Service fee + comisión del repartidor · tasa ${data.iva_rate_percent}%`}
             />
             <KpiCard
               label="Tarifa neta (sin IVA)"

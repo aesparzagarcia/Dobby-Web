@@ -31,6 +31,7 @@ const CONFIG_KEYS = [
   "ZONE_C_FEE",
   "ZONE_D_FEE",
   "SERVICE_FEE_RATE",
+  "COURIER_COMMISSION_RATE",
 ] as const;
 
 const DEMAND_OPTIONS = [1, 1.1, 1.2, 1.3, 1.4, 1.5];
@@ -325,9 +326,12 @@ export default function ConfiguracionPage() {
           .forEach((r) => {
             byKey[r.key] = r;
             d[r.key] =
-              r.key === "SERVICE_FEE_RATE" ? serviceFeePercentFromStored(r.value) : r.value;
+              r.key === "SERVICE_FEE_RATE" || r.key === "COURIER_COMMISSION_RATE"
+                ? serviceFeePercentFromStored(r.value)
+                : r.value;
           });
         if (!d.SERVICE_FEE_RATE) d.SERVICE_FEE_RATE = "8";
+        if (!d.COURIER_COMMISSION_RATE) d.COURIER_COMMISSION_RATE = "15";
         setRowsByKey(byKey);
         setDraft(d);
         setSimRain(d.DEFAULT_IS_RAINING === "true");
@@ -386,6 +390,7 @@ export default function ConfiguracionPage() {
     setError(null);
     try {
       const serviceFeePercent = Number.parseFloat(draft.SERVICE_FEE_RATE ?? "");
+      const courierPercent = Number.parseFloat(draft.COURIER_COMMISSION_RATE ?? "");
       if (
         !Number.isFinite(serviceFeePercent) ||
         serviceFeePercent < 0 ||
@@ -395,17 +400,25 @@ export default function ConfiguracionPage() {
         setSaving(false);
         return;
       }
+      if (!Number.isFinite(courierPercent) || courierPercent < 0 || courierPercent > 100) {
+        setError("La comisión del repartidor debe ser un porcentaje entre 0 y 100.");
+        setSaving(false);
+        return;
+      }
+      const percentKeys = new Set(["SERVICE_FEE_RATE", "COURIER_COMMISSION_RATE"]);
       const items = Object.values(rowsByKey).map((r) => ({
         key: r.key,
-        value:
-          r.key === "SERVICE_FEE_RATE"
-            ? serviceFeePercent / 100
-            : r.type === "BOOLEAN"
-              ? draft[r.key] === "true"
-              : Number.parseFloat(draft[r.key] ?? "0"),
+        value: percentKeys.has(r.key)
+          ? Number.parseFloat(draft[r.key] ?? "0") / 100
+          : r.type === "BOOLEAN"
+            ? draft[r.key] === "true"
+            : Number.parseFloat(draft[r.key] ?? "0"),
       }));
       if (!rowsByKey.SERVICE_FEE_RATE) {
         items.push({ key: "SERVICE_FEE_RATE", value: serviceFeePercent / 100 });
+      }
+      if (!rowsByKey.COURIER_COMMISSION_RATE) {
+        items.push({ key: "COURIER_COMMISSION_RATE", value: courierPercent / 100 });
       }
       const res = await apiFetch("/api/admin/app-config", {
         method: "PUT",
@@ -563,6 +576,52 @@ export default function ConfiguracionPage() {
                 value={draft.SERVICE_FEE_RATE ?? ""}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, SERVICE_FEE_RATE: e.target.value }))
+                }
+              />
+              <span className="text-sm text-gray-500">%</span>
+            </div>
+          </label>
+        </SectionCard>
+
+        <SectionCard
+          title="Comisión del repartidor"
+          icon={<span className="text-sm font-bold">%</span>}
+          aside={
+            <div>
+              <p className="text-xs font-semibold text-dobby-600 uppercase tracking-wide mb-3">
+                Ejemplo de cálculo
+              </p>
+              <BreakdownList
+                rows={[
+                  { label: "Envío", value: formatMoney(30) },
+                  {
+                    label: `Comisión (${numDraft(draft, "COURIER_COMMISSION_RATE", 15)}%)`,
+                    value: formatMoney(
+                      roundMoney((30 * numDraft(draft, "COURIER_COMMISSION_RATE", 15)) / 100)
+                    ),
+                    highlight: true,
+                  },
+                ]}
+              />
+            </div>
+          }
+        >
+          <label className="block max-w-xs">
+            <span className="text-sm font-medium text-gray-700">Porcentaje del envío</span>
+            <p className="text-xs text-gray-500 mt-0.5 mb-2">
+              Solo el super admin puede cambiarlo. Se retiene del envío del repartidor en
+              pedidos nuevos. El cliente no paga de más.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={100}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                value={draft.COURIER_COMMISSION_RATE ?? ""}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, COURIER_COMMISSION_RATE: e.target.value }))
                 }
               />
               <span className="text-sm text-gray-500">%</span>

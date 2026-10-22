@@ -58,6 +58,7 @@ type IncomeData = {
     ordersSubtotal: number;
     discountsApplied: number;
     platformCommissions: number;
+    courierCommissions?: number;
     deliveryFees: number;
     tipsForCouriers: number;
     netIncome: number;
@@ -634,11 +635,17 @@ export default function IncomePage() {
                 </li>
                 <li className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-gray-600">
-                    Comisión de la app ({b.commissionRatePercent}%)
+                    Service fee ({b.commissionRatePercent}%)
                     <IconInfo className="w-3.5 h-3.5 text-gray-400" />
                   </span>
                   <span className="font-medium text-violet-700 tabular-nums">
                     {formatMoney(b.platformCommissions)}
+                  </span>
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span className="text-gray-600">Comisión del repartidor</span>
+                  <span className="font-medium text-violet-700 tabular-nums">
+                    {formatMoney(b.courierCommissions ?? 0)}
                   </span>
                 </li>
                 {b.discountsApplied > 0 ? (
@@ -657,7 +664,9 @@ export default function IncomePage() {
                 </li>
               </ul>
               <div className="mt-5 rounded-xl bg-dobby-50 border border-dobby-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-dobby-900">Ingreso app (comisiones)</span>
+                <span className="text-sm font-semibold text-dobby-900">
+                  Utilidad (service fee + comisión)
+                </span>
                 <span className="text-lg font-bold text-dobby-700 tabular-nums">
                   {formatMoney(b.netIncome)}
                 </span>

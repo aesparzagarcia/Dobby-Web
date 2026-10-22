@@ -32,6 +32,8 @@ type EarningsResponse = {
   date: string;
   summary: {
     deliveryCount: number;
+    totalDeliveryFees?: number;
+    totalCommission?: number;
     totalEarned: number;
     totalOrderValue: number;
   };
@@ -195,11 +197,14 @@ export default function DriverEarningsPage() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <p className="text-xs uppercase tracking-wide text-gray-400 font-medium">Generado</p>
+              <p className="text-xs uppercase tracking-wide text-gray-400 font-medium">A pagar</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {formatMoney(data.summary.totalEarned)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Suma de tarifas de envío del día</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Envío {formatMoney(data.summary.totalDeliveryFees ?? data.summary.totalEarned)} menos
+                comisión {formatMoney(data.summary.totalCommission ?? 0)}
+              </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <p className="text-xs uppercase tracking-wide text-gray-400 font-medium">Entregas</p>

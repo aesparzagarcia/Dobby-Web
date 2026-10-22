@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { apiFetch, authHeaders, authHeadersForUpload, uploadsUrl } from "@/lib/api";
 import { ShopCoverImage } from "@/components/ShopCoverImage";
 import { isUsableWgs84Point, shopLocationError } from "@/lib/geo";
@@ -449,6 +449,152 @@ function ShopCardHours({ windows }: { windows: ShopHourWindow[] }) {
   );
 }
 
+type CommissionPayment = {
+  id: string;
+  amount: number;
+  note: string | null;
+  createdAt: string;
+};
+
+function CarWashCommissionButton({ shopId, shopName }: { shopId: string; shopName: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [outstanding, setOutstanding] = useState(0);
+  const [payments, setPayments] = useState<CommissionPayment[]>([]);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/shops/${shopId}/commission`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo cargar el saldo");
+        return;
+      }
+      setOutstanding(Number(data.outstandingOwed) || 0);
+      setPayments(Array.isArray(data.payments) ? data.payments : []);
+    } catch {
+      setError("No se pudo cargar el saldo");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function register(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/shops/${shopId}/commission-payments`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ amount: Number(amount), note }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo registrar el cobro");
+        return;
+      }
+      setAmount("");
+      setNote("");
+      setOutstanding(Number(data.outstandingOwed) || 0);
+      await load();
+    } catch {
+      setError("No se pudo registrar el cobro");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true);
+          void load();
+        }}
+        className="w-full text-sm font-medium text-dobby-700 border border-dobby-200 rounded-lg py-1.5 hover:bg-dobby-50"
+      >
+        Registrar cobro
+      </button>
+      {open ? (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900">Cobro a {shopName}</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Saldo de la comisión de pedidos entregados, menos lo ya cobrado.
+            </p>
+            <p className="text-2xl font-bold text-gray-900 mt-3 tabular-nums">
+              {loading ? "…" : formatMoney(outstanding)}
+            </p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Por cobrar</p>
+            <form onSubmit={register} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Monto cobrado</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Nota</label>
+                <input
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Efectivo, transferencia…"
+                  maxLength={200}
+                />
+              </div>
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={saving || loading}
+                  className="flex-1 bg-dobby-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dobby-700 disabled:opacity-50"
+                >
+                  {saving ? "Guardando…" : "Registrar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </form>
+            {payments.length > 0 ? (
+              <ul className="mt-4 space-y-2 border-t border-gray-100 pt-3">
+                {payments.map((p) => (
+                  <li key={p.id} className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-500">
+                      {new Date(p.createdAt).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}
+                      {p.note ? ` · ${p.note}` : ""}
+                    </span>
+                    <span className="font-medium tabular-nums shrink-0">{formatMoney(p.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function ShopCard({
   shop,
   menuOpen,
@@ -618,6 +764,12 @@ function ShopCard({
           </p>
         </div>
       </div>
+
+      {shop.type === "CAR_WASH" && canWrite ? (
+        <div className="px-3 pb-2">
+          <CarWashCommissionButton shopId={shop.id} shopName={shop.name} />
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100">
         <button
