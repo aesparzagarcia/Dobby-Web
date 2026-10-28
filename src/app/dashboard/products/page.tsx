@@ -17,6 +17,21 @@ const MAX_PHOTOS = 3;
 const PAGE_SIZE = 8;
 
 type ProductVariant = { id?: string; name: string; price: number };
+type ProductOption = { id?: string; name: string };
+type ProductOptionGroup = {
+  id?: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  options: ProductOption[];
+};
+type SaleType = "unique" | "variants" | "combo";
+type ComboGroupForm = {
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  options: { name: string }[];
+};
 
 type Product = {
   id: string;
@@ -24,6 +39,7 @@ type Product = {
   description: string | null;
   price: string | number;
   variants?: ProductVariant[];
+  optionGroups?: ProductOptionGroup[];
   imageUrls: string[];
   hasPromotion: boolean;
   discount: number;
@@ -80,12 +96,52 @@ function productVariants(p: Product): ProductVariant[] {
   return Array.isArray(p.variants) ? p.variants : [];
 }
 
+function defaultComboGroups(): ComboGroupForm[] {
+  return [
+    { name: "Guiso", minSelect: 1, maxSelect: 1, options: [{ name: "" }, { name: "" }] },
+    { name: "Guarnición", minSelect: 2, maxSelect: 2, options: [{ name: "" }, { name: "" }] },
+  ];
+}
+
+function optionGroupsFromForm(groups: ComboGroupForm[]): { name: string; minSelect: number; maxSelect: number; options: { name: string }[] }[] | string {
+  if (groups.length === 0) return "Agrega al menos un grupo.";
+  const names = new Set<string>();
+  const out: { name: string; minSelect: number; maxSelect: number; options: { name: string }[] }[] = [];
+  for (const group of groups) {
+    const name = group.name.trim();
+    if (!name) return "Cada grupo del combo necesita un nombre.";
+    const key = name.toLowerCase();
+    if (names.has(key)) return "No repitas el nombre de un grupo del combo.";
+    names.add(key);
+    if (group.minSelect < 1 || group.maxSelect < group.minSelect) {
+      return `En "${name}" el máximo debe ser al menos el mínimo.`;
+    }
+    const options = group.options.map((option) => option.name.trim()).filter(Boolean);
+    const seen = new Set<string>();
+    for (const option of options) {
+      const optionKey = option.toLowerCase();
+      if (seen.has(optionKey)) return `No repitas "${option}" en ${name}.`;
+      seen.add(optionKey);
+    }
+    if (options.length < group.maxSelect) {
+      return `"${name}" pide elegir ${group.maxSelect} y tiene menos opciones.`;
+    }
+    out.push({
+      name,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      options: options.map((optionName) => ({ name: optionName })),
+    });
+  }
+  return out;
+}
+
 function variantsFromForm(form: {
-  saleType: "unique" | "variants";
+  saleType: SaleType;
   price: string;
   variantRows: { name: string; price: string }[];
 }): { name: string; price: number }[] {
-  if (form.saleType === "unique") {
+  if (form.saleType === "unique" || form.saleType === "combo") {
     const price = Number(form.price);
     if (!Number.isFinite(price) || price < 0) return [];
     return [{ name: DEFAULT_VARIANT_NAME, price }];
@@ -189,6 +245,14 @@ function ProductCard({
   const { canWrite } = useAdminAccess();
   const variants = productVariants(p);
   const hasMultiple = variants.length > 1;
+  const comboGroups = Array.isArray(p.optionGroups) ? p.optionGroups : [];
+  const comboSummary = comboGroups
+    .map((group) =>
+      group.minSelect === group.maxSelect
+        ? `${group.name} (${group.minSelect})`
+        : `${group.name} (${group.minSelect}-${group.maxSelect})`
+    )
+    .join(" · ");
   const originalPrice = Number(p.price) || 0;
   const displayPrice =
     p.hasPromotion && p.discount > 0
@@ -295,6 +359,9 @@ function ProductCard({
                 <p className="text-sm text-dobby-pure-graphite mt-1 line-clamp-2">{description}</p>
               ) : null}
             </button>
+            {comboSummary ? (
+              <p className="mt-2 text-xs text-dobby-pure-ash">Combo · {comboSummary}</p>
+            ) : null}
             {variantList}
             <div className="mt-auto pt-3 flex items-center justify-between gap-3">
               {!hasMultiple ? (
@@ -346,6 +413,9 @@ function ProductCard({
         </div>
       </button>
       <div className="px-4 pb-4 pt-1 flex flex-col flex-1">
+        {comboSummary ? (
+          <p className="mt-2 text-xs text-dobby-pure-ash">Combo · {comboSummary}</p>
+        ) : null}
         {variantList}
         <div className="mt-auto pt-4">
           <div className="flex items-center justify-between gap-3">
@@ -396,9 +466,10 @@ export default function ProductsPage() {
     shopId: "",
     name: "",
     description: "",
-    saleType: "unique" as "unique" | "variants",
+    saleType: "unique" as SaleType,
     price: "",
     variantRows: [{ name: "", price: "" }] as { name: string; price: string }[],
+    comboGroups: [] as ComboGroupForm[],
     imageUrls: [] as string[],
     hasPromotion: false,
     discount: 0,
@@ -491,19 +562,28 @@ export default function ProductsPage() {
     const variants = formShopIsRestaurant ? variantsFromForm(form) : [];
     if (formShopIsRestaurant && variants.length === 0) {
       alert(
-        form.saleType === "unique"
-          ? "El precio es obligatorio."
-          : "Agrega al menos una presentación con nombre y precio."
+        form.saleType === "variants"
+          ? "Agrega al menos una presentación con nombre y precio."
+          : "El precio es obligatorio."
       );
       return;
+    }
+    let optionGroups: { name: string; minSelect: number; maxSelect: number; options: { name: string }[] }[] = [];
+    if (formShopIsRestaurant && form.saleType === "combo") {
+      const parsed = optionGroupsFromForm(form.comboGroups ?? []);
+      if (typeof parsed === "string") {
+        alert(parsed);
+        return;
+      }
+      optionGroups = parsed;
     }
     if (!formShopIsRestaurant && (form.price === "" || Number.isNaN(Number(form.price)))) {
       alert("El precio es obligatorio.");
       return;
     }
     const pricePayload = formShopIsRestaurant
-      ? { variants }
-      : { price: form.price ? Number(form.price) : undefined, variants: [] };
+      ? { variants, optionGroups }
+      : { price: form.price ? Number(form.price) : undefined, variants: [], optionGroups: [] };
     const body = editId
       ? {
           name: form.name,
@@ -563,20 +643,30 @@ export default function ProductsPage() {
     setEditId(p.id);
     setEditShopType(p.shop?.type ?? null);
     const variants = productVariants(p);
+    const loadedGroups = Array.isArray(p.optionGroups) ? p.optionGroups : [];
+    const isCombo = loadedGroups.length > 0;
     const uniqueOnly =
-      variants.length === 0 || (variants.length === 1 && isUnicaName(variants[0]?.name));
+      !isCombo && (variants.length === 0 || (variants.length === 1 && isUnicaName(variants[0]?.name)));
     setForm({
       shopId: "",
       name: p.name,
       description: p.description || "",
-      saleType: uniqueOnly ? "unique" : "variants",
-      price: uniqueOnly
+      saleType: isCombo ? "combo" : uniqueOnly ? "unique" : "variants",
+      price: isCombo || uniqueOnly
         ? String(variants[0]?.price ?? p.price)
         : String(p.price),
       variantRows:
-        uniqueOnly
+        uniqueOnly || isCombo
           ? [{ name: "", price: "" }]
           : variants.map((v) => ({ name: v.name, price: String(v.price) })),
+      comboGroups: isCombo
+        ? loadedGroups.map((group) => ({
+            name: group.name,
+            minSelect: group.minSelect,
+            maxSelect: group.maxSelect,
+            options: group.options.map((option) => ({ name: option.name })),
+          }))
+        : [],
       imageUrls: Array.isArray(p.imageUrls) ? [...p.imageUrls] : [],
       hasPromotion: !!p.hasPromotion,
       discount: Number.isFinite(Number(p.discount)) ? Number(p.discount) : 0,
@@ -825,7 +915,7 @@ export default function ProductsPage() {
 
       {modal !== "closed" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold mb-4">
               {modal === "create" ? "Nuevo producto" : canWrite ? "Editar producto" : "Detalle de producto"}
             </h2>
@@ -846,6 +936,7 @@ export default function ProductsPage() {
                         saleType: "unique",
                         price: "",
                         variantRows: [{ name: "", price: "" }],
+                        comboGroups: [],
                       }));
                     }}
                     className="w-full border rounded-lg px-3 py-2"
@@ -873,9 +964,9 @@ export default function ProductsPage() {
                   <div>
                     <p className="text-sm text-gray-600">Precio y presentaciones</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Elige si el producto tiene un solo precio o varias presentaciones.
+                      Precio único, varias presentaciones, o un combo con grupos para elegir.
                     </p>
-                    <div className="mt-2 flex gap-4">
+                    <div className="mt-2 flex flex-wrap gap-4">
                       <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                         <input
                           type="radio"
@@ -901,9 +992,27 @@ export default function ProductsPage() {
                         />
                         Variantes
                       </label>
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="radio"
+                          name="saleType"
+                          checked={form.saleType === "combo"}
+                          onChange={() =>
+                            setForm((f) => ({
+                              ...f,
+                              saleType: "combo",
+                              comboGroups:
+                                f.comboGroups && f.comboGroups.length > 0
+                                  ? f.comboGroups
+                                  : defaultComboGroups(),
+                            }))
+                          }
+                        />
+                        Combo
+                      </label>
                     </div>
                   </div>
-                  {form.saleType === "unique" ? (
+                  {form.saleType === "unique" || form.saleType === "combo" ? (
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Precio</label>
                       <input
@@ -986,6 +1095,170 @@ export default function ProductsPage() {
                       </button>
                     </div>
                   )}
+                  {form.saleType === "combo" ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-500">
+                        El cliente elige dentro de cada grupo. El precio del combo no cambia.
+                      </p>
+                      {(form.comboGroups ?? []).map((group, groupIndex) => (
+                        <div key={groupIndex} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={group.name}
+                              onChange={(e) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  comboGroups: f.comboGroups.map((g, i) =>
+                                    i === groupIndex ? { ...g, name: e.target.value } : g
+                                  ),
+                                }))
+                              }
+                              className="flex-1 border rounded-lg px-3 py-2 text-sm font-medium"
+                              placeholder="Ej. Guiso"
+                            />
+                            <button
+                              type="button"
+                              disabled={(form.comboGroups ?? []).length <= 1}
+                              onClick={() =>
+                                setForm((f) => ({
+                                  ...f,
+                                  comboGroups:
+                                    f.comboGroups.length <= 1
+                                      ? f.comboGroups
+                                      : f.comboGroups.filter((_, i) => i !== groupIndex),
+                                }))
+                              }
+                              className="text-red-500 p-1 disabled:opacity-30"
+                              title="Quitar grupo"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="flex gap-3">
+                            <label className="text-xs text-gray-500">
+                              Mínimo
+                              <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={group.minSelect}
+                                onChange={(e) => {
+                                  const minSelect = Math.max(1, Number(e.target.value) || 1);
+                                  setForm((f) => ({
+                                    ...f,
+                                    comboGroups: f.comboGroups.map((g, i) =>
+                                      i === groupIndex
+                                        ? { ...g, minSelect, maxSelect: Math.max(g.maxSelect, minSelect) }
+                                        : g
+                                    ),
+                                  }));
+                                }}
+                                className="mt-1 w-20 border rounded-lg px-2 py-1"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-500">
+                              Máximo
+                              <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={group.maxSelect}
+                                onChange={(e) => {
+                                  const maxSelect = Math.max(group.minSelect, Number(e.target.value) || 1);
+                                  setForm((f) => ({
+                                    ...f,
+                                    comboGroups: f.comboGroups.map((g, i) =>
+                                      i === groupIndex ? { ...g, maxSelect } : g
+                                    ),
+                                  }));
+                                }}
+                                className="mt-1 w-20 border rounded-lg px-2 py-1"
+                              />
+                            </label>
+                          </div>
+                          {group.options.map((option, optionIndex) => (
+                            <div key={optionIndex} className="flex items-center gap-2">
+                              <input
+                                value={option.name}
+                                onChange={(e) =>
+                                  setForm((f) => ({
+                                    ...f,
+                                    comboGroups: f.comboGroups.map((g, i) =>
+                                      i === groupIndex
+                                        ? {
+                                            ...g,
+                                            options: g.options.map((row, j) =>
+                                              j === optionIndex ? { name: e.target.value } : row
+                                            ),
+                                          }
+                                        : g
+                                    ),
+                                  }))
+                                }
+                                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                                placeholder="Ej. Pollo a la naranja"
+                              />
+                              <button
+                                type="button"
+                                disabled={group.options.length <= 2}
+                                onClick={() =>
+                                  setForm((f) => ({
+                                    ...f,
+                                    comboGroups: f.comboGroups.map((g, i) =>
+                                      i === groupIndex
+                                        ? {
+                                            ...g,
+                                            options:
+                                              g.options.length <= 2
+                                                ? g.options
+                                                : g.options.filter((_, j) => j !== optionIndex),
+                                          }
+                                        : g
+                                    ),
+                                  }))
+                                }
+                                className="text-gray-400 p-1 disabled:opacity-30"
+                                title="Quitar opción"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                comboGroups: f.comboGroups.map((g, i) =>
+                                  i === groupIndex ? { ...g, options: [...g.options, { name: "" }] } : g
+                                ),
+                              }))
+                            }
+                            className="text-sm text-dobby-700 font-medium hover:underline"
+                          >
+                            + Agregar opción
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            comboGroups: [
+                              ...f.comboGroups,
+                              { name: "", minSelect: 1, maxSelect: 1, options: [{ name: "" }, { name: "" }] },
+                            ],
+                          }))
+                        }
+                        className="text-sm text-dobby-700 font-medium hover:underline"
+                      >
+                        + Agregar grupo
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div>
