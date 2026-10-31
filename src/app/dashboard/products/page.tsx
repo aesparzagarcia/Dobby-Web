@@ -17,12 +17,13 @@ const MAX_PHOTOS = 3;
 const PAGE_SIZE = 8;
 
 type ProductVariant = { id?: string; name: string; price: number };
-type ProductOption = { id?: string; name: string };
+type ProductOption = { id?: string; name: string; imageUrl?: string | null };
 type ProductOptionGroup = {
   id?: string;
   name: string;
   minSelect: number;
   maxSelect: number;
+  imageUrl?: string | null;
   options: ProductOption[];
 };
 type SaleType = "unique" | "variants" | "combo";
@@ -30,7 +31,8 @@ type ComboGroupForm = {
   name: string;
   minSelect: number;
   maxSelect: number;
-  options: { name: string }[];
+  imageUrl: string;
+  options: { name: string; imageUrl: string }[];
 };
 
 type Product = {
@@ -98,15 +100,15 @@ function productVariants(p: Product): ProductVariant[] {
 
 function defaultComboGroups(): ComboGroupForm[] {
   return [
-    { name: "Guiso", minSelect: 1, maxSelect: 1, options: [{ name: "" }, { name: "" }] },
-    { name: "Guarnición", minSelect: 2, maxSelect: 2, options: [{ name: "" }, { name: "" }] },
+    { name: "Guiso", minSelect: 1, maxSelect: 1, imageUrl: "", options: [{ name: "", imageUrl: "" }, { name: "", imageUrl: "" }] },
+    { name: "Guarnición", minSelect: 2, maxSelect: 2, imageUrl: "", options: [{ name: "", imageUrl: "" }, { name: "", imageUrl: "" }] },
   ];
 }
 
-function optionGroupsFromForm(groups: ComboGroupForm[]): { name: string; minSelect: number; maxSelect: number; options: { name: string }[] }[] | string {
+function optionGroupsFromForm(groups: ComboGroupForm[]): { name: string; minSelect: number; maxSelect: number; imageUrl: string | null; options: { name: string; imageUrl: string | null }[] }[] | string {
   if (groups.length === 0) return "Agrega al menos un grupo.";
   const names = new Set<string>();
-  const out: { name: string; minSelect: number; maxSelect: number; options: { name: string }[] }[] = [];
+  const out: { name: string; minSelect: number; maxSelect: number; imageUrl: string | null; options: { name: string; imageUrl: string | null }[] }[] = [];
   for (const group of groups) {
     const name = group.name.trim();
     if (!name) return "Cada grupo del combo necesita un nombre.";
@@ -116,11 +118,13 @@ function optionGroupsFromForm(groups: ComboGroupForm[]): { name: string; minSele
     if (group.minSelect < 1 || group.maxSelect < group.minSelect) {
       return `En "${name}" el máximo debe ser al menos el mínimo.`;
     }
-    const options = group.options.map((option) => option.name.trim()).filter(Boolean);
+    const options = group.options
+      .map((option) => ({ name: option.name.trim(), imageUrl: (option.imageUrl ?? "").trim() || null }))
+      .filter((option) => option.name);
     const seen = new Set<string>();
     for (const option of options) {
-      const optionKey = option.toLowerCase();
-      if (seen.has(optionKey)) return `No repitas "${option}" en ${name}.`;
+      const optionKey = option.name.toLowerCase();
+      if (seen.has(optionKey)) return `No repitas "${option.name}" en ${name}.`;
       seen.add(optionKey);
     }
     if (options.length < group.maxSelect) {
@@ -130,7 +134,8 @@ function optionGroupsFromForm(groups: ComboGroupForm[]): { name: string; minSele
       name,
       minSelect: group.minSelect,
       maxSelect: group.maxSelect,
-      options: options.map((optionName) => ({ name: optionName })),
+      imageUrl: (group.imageUrl ?? "").trim() || null,
+      options,
     });
   }
   return out;
@@ -664,7 +669,8 @@ export default function ProductsPage() {
             name: group.name,
             minSelect: group.minSelect,
             maxSelect: group.maxSelect,
-            options: group.options.map((option) => ({ name: option.name })),
+            imageUrl: group.imageUrl ?? "",
+            options: group.options.map((option) => ({ name: option.name, imageUrl: option.imageUrl ?? "" })),
           }))
         : [],
       imageUrls: Array.isArray(p.imageUrls) ? [...p.imageUrls] : [],
@@ -678,6 +684,31 @@ export default function ProductsPage() {
             : DEFAULT_PRODUCT_CATEGORY) as ProductCategoryValue),
     });
     setModal("edit");
+  }
+
+  async function uploadComboPhoto(file: File): Promise<string | null> {
+    if (!file.type.startsWith("image/")) {
+      alert("Solo se permiten imágenes (JPEG, PNG, GIF, WebP).");
+      return null;
+    }
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch("/api/upload/product-image", {
+        method: "POST",
+        headers: { ...authHeadersForUpload() },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Error al subir la imagen");
+        return null;
+      }
+      return typeof data.url === "string" ? data.url : null;
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   async function handleProductImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1103,6 +1134,32 @@ export default function ProductsPage() {
                       {(form.comboGroups ?? []).map((group, groupIndex) => (
                         <div key={groupIndex} className="rounded-lg border border-gray-200 p-3 space-y-2">
                           <div className="flex items-center gap-2">
+                            <label className="relative shrink-0 w-11 h-11 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center cursor-pointer" title="Foto del grupo">
+                              {group.imageUrl ? (
+                                <img src={uploadsUrl(group.imageUrl)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] text-gray-400">Foto</span>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                disabled={imageUploading}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = "";
+                                  if (!file) return;
+                                  const url = await uploadComboPhoto(file);
+                                  if (!url) return;
+                                  setForm((f) => ({
+                                    ...f,
+                                    comboGroups: f.comboGroups.map((g, i) =>
+                                      i === groupIndex ? { ...g, imageUrl: url } : g
+                                    ),
+                                  }));
+                                }}
+                              />
+                            </label>
                             <input
                               value={group.name}
                               onChange={(e) =>
@@ -1180,6 +1237,39 @@ export default function ProductsPage() {
                           </div>
                           {group.options.map((option, optionIndex) => (
                             <div key={optionIndex} className="flex items-center gap-2">
+                              <label className="relative shrink-0 w-11 h-11 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center cursor-pointer" title="Foto de la opción">
+                                {option.imageUrl ? (
+                                  <img src={uploadsUrl(option.imageUrl)} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">Foto</span>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="absolute inset-0 opacity-0 cursor-pointer"
+                                  disabled={imageUploading}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = "";
+                                    if (!file) return;
+                                    const url = await uploadComboPhoto(file);
+                                    if (!url) return;
+                                    setForm((f) => ({
+                                      ...f,
+                                      comboGroups: f.comboGroups.map((g, i) =>
+                                        i === groupIndex
+                                          ? {
+                                              ...g,
+                                              options: g.options.map((row, j) =>
+                                                j === optionIndex ? { ...row, imageUrl: url } : row
+                                              ),
+                                            }
+                                          : g
+                                      ),
+                                    }));
+                                  }}
+                                />
+                              </label>
                               <input
                                 value={option.name}
                                 onChange={(e) =>
@@ -1190,7 +1280,7 @@ export default function ProductsPage() {
                                         ? {
                                             ...g,
                                             options: g.options.map((row, j) =>
-                                              j === optionIndex ? { name: e.target.value } : row
+                                              j === optionIndex ? { ...row, name: e.target.value } : row
                                             ),
                                           }
                                         : g
@@ -1232,7 +1322,7 @@ export default function ProductsPage() {
                               setForm((f) => ({
                                 ...f,
                                 comboGroups: f.comboGroups.map((g, i) =>
-                                  i === groupIndex ? { ...g, options: [...g.options, { name: "" }] } : g
+                                  i === groupIndex ? { ...g, options: [...g.options, { name: "", imageUrl: "" }] } : g
                                 ),
                               }))
                             }
@@ -1249,7 +1339,7 @@ export default function ProductsPage() {
                             ...f,
                             comboGroups: [
                               ...f.comboGroups,
-                              { name: "", minSelect: 1, maxSelect: 1, options: [{ name: "" }, { name: "" }] },
+                              { name: "", minSelect: 1, maxSelect: 1, imageUrl: "", options: [{ name: "", imageUrl: "" }, { name: "", imageUrl: "" }] },
                             ],
                           }))
                         }
