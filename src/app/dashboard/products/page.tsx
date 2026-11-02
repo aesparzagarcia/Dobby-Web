@@ -49,7 +49,8 @@ type Product = {
   category?: string;
   createdAt?: string;
   quantitySold?: number;
-  shop: { name: string; type?: string };
+  shopId?: string;
+  shop: { id?: string; name: string; type?: string };
 };
 
 type Shop = { id: string; name: string; type?: string };
@@ -483,16 +484,31 @@ export default function ProductsPage() {
   };
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editShopType, setEditShopType] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const productImageInputRef = useRef<HTMLInputElement>(null);
 
   const selectedShop = shops.find((s) => s.id === form.shopId);
-  const formShopIsCarWash =
-    modal === "edit" ? editShopType === "CAR_WASH" : isCarWashShop(selectedShop);
-  const formShopIsRestaurant =
-    modal === "edit" ? editShopType === "RESTAURANT" : isRestaurantShop(selectedShop);
+  const formShopIsCarWash = isCarWashShop(selectedShop);
+  const formShopIsRestaurant = isRestaurantShop(selectedShop);
+
+  function applyShopToForm(shopId: string) {
+    const shop = shops.find((s) => s.id === shopId);
+    const previous = shops.find((s) => s.id === form.shopId);
+    const typeChanged = (shop?.type ?? "") !== (previous?.type ?? "");
+    setForm((f) => ({
+      ...f,
+      shopId,
+      ...(typeChanged
+        ? {
+            category: categoryForShop(shop),
+            saleType: "unique" as SaleType,
+            variantRows: [{ name: "", price: "" }],
+            comboGroups: [],
+          }
+        : {}),
+    }));
+  }
 
   function load() {
     Promise.all([
@@ -582,6 +598,10 @@ export default function ProductsPage() {
       }
       optionGroups = parsed;
     }
+    if (!form.shopId) {
+      alert("Selecciona una tienda.");
+      return;
+    }
     if (!formShopIsRestaurant && (form.price === "" || Number.isNaN(Number(form.price)))) {
       alert("El precio es obligatorio.");
       return;
@@ -589,28 +609,17 @@ export default function ProductsPage() {
     const pricePayload = formShopIsRestaurant
       ? { variants, optionGroups }
       : { price: form.price ? Number(form.price) : undefined, variants: [], optionGroups: [] };
-    const body = editId
-      ? {
-          name: form.name,
-          description: form.description || null,
-          ...pricePayload,
-          imageUrls: form.imageUrls,
-          hasPromotion: form.hasPromotion,
-          discount: normalizedDiscount,
-          isActive: form.isActive,
-          category: resolvedCategory,
-        }
-      : {
-          shopId: form.shopId,
-          name: form.name,
-          description: form.description || null,
-          ...pricePayload,
-          imageUrls: form.imageUrls,
-          hasPromotion: form.hasPromotion,
-          discount: normalizedDiscount,
-          isActive: form.isActive,
-          category: resolvedCategory,
-        };
+    const body = {
+      shopId: form.shopId,
+      name: form.name,
+      description: form.description || null,
+      ...pricePayload,
+      imageUrls: form.imageUrls,
+      hasPromotion: form.hasPromotion,
+      discount: normalizedDiscount,
+      isActive: form.isActive,
+      category: resolvedCategory,
+    };
     const res = await apiFetch(url, {
       method,
       headers: authHeaders(),
@@ -619,7 +628,6 @@ export default function ProductsPage() {
     if (res.ok) {
       setModal("closed");
       setEditId(null);
-      setEditShopType(null);
       setForm({
         ...emptyForm,
         shopId: shops[0]?.id || "",
@@ -635,7 +643,6 @@ export default function ProductsPage() {
   function openCreate() {
     setModal("create");
     setEditId(null);
-    setEditShopType(null);
     const first = shops[0];
     setForm({
       ...emptyForm,
@@ -646,14 +653,17 @@ export default function ProductsPage() {
 
   function openEdit(p: Product) {
     setEditId(p.id);
-    setEditShopType(p.shop?.type ?? null);
     const variants = productVariants(p);
     const loadedGroups = Array.isArray(p.optionGroups) ? p.optionGroups : [];
     const isCombo = loadedGroups.length > 0;
     const uniqueOnly =
       !isCombo && (variants.length === 0 || (variants.length === 1 && isUnicaName(variants[0]?.name)));
     setForm({
-      shopId: "",
+      shopId:
+        p.shopId ||
+        p.shop?.id ||
+        shops.find((s) => s.name === p.shop?.name)?.id ||
+        "",
       name: p.name,
       description: p.description || "",
       saleType: isCombo ? "combo" : uniqueOnly ? "unique" : "variants",
@@ -952,35 +962,26 @@ export default function ProductsPage() {
             </h2>
             <form onSubmit={handleSubmit} className="space-y-3">
               <fieldset disabled={!canWrite} className="space-y-3 min-w-0 border-0 p-0 m-0">
-              {modal === "create" && (
-                <div>
-                  <label className="block text-sm text-gray-600">Tienda</label>
-                  <select
-                    value={form.shopId}
-                    onChange={(e) => {
-                      const shopId = e.target.value;
-                      const shop = shops.find((s) => s.id === shopId);
-                      setForm((f) => ({
-                        ...f,
-                        shopId,
-                        category: categoryForShop(shop),
-                        saleType: "unique",
-                        price: "",
-                        variantRows: [{ name: "", price: "" }],
-                        comboGroups: [],
-                      }));
-                    }}
-                    className="w-full border rounded-lg px-3 py-2"
-                    required
-                  >
-                    {shops.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm text-gray-600">Tienda</label>
+                <select
+                  value={form.shopId}
+                  onChange={(e) => applyShopToForm(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  required
+                >
+                  {form.shopId === "" && (
+                    <option value="" disabled>
+                      Selecciona una tienda
+                    </option>
+                  )}
+                  {shops.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm text-gray-600">Nombre</label>
                 <input
@@ -1383,11 +1384,7 @@ export default function ProductsPage() {
                     className="w-full border rounded-lg px-3 py-2"
                     required
                   >
-                    {productCategoriesForShopType(
-                      modal === "edit"
-                        ? editShopType
-                        : shops.find((s) => s.id === form.shopId)?.type
-                    ).map((c) => (
+                    {productCategoriesForShopType(selectedShop?.type).map((c) => (
                       <option key={c.value} value={c.value}>
                         {c.label}
                       </option>
