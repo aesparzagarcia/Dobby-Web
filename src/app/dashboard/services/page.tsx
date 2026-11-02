@@ -14,7 +14,7 @@ import {
 } from "@/lib/serviceArea";
 
 const ShopLocationPickerMap = dynamic(
-  () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
+  () => import("@/components/ShopLocationPickerMap"),
   {
     ssr: false,
     loading: () => (

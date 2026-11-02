@@ -838,3 +838,5 @@ export function ShopLocationPickerMap({
     </div>
   );
 }
+
+export default ShopLocationPickerMap;

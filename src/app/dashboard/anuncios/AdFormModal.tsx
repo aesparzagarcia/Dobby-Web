@@ -7,7 +7,7 @@ import { WriteOnly } from "@/components/dashboard/WriteOnly";
 import { useAdminAccess } from "@/contexts/AdminAccessContext";
 
 const ShopLocationPickerMap = dynamic(
-  () => import("@/components/ShopLocationPickerMap").then((m) => m.ShopLocationPickerMap),
+  () => import("@/components/ShopLocationPickerMap"),
   {
     ssr: false,
     loading: () => (
